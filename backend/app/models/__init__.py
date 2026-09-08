@@ -8,6 +8,7 @@ from app.models.habit import Habit, HabitRecord
 from app.models.file import FileMetadata, FileShare
 from app.models.resource import Resource
 from app.models.ai_interaction import AIInteraction
+from app.models.journal import DailyJournal
 
 __all__ = [
     "Base",
@@ -21,4 +22,5 @@ __all__ = [
     "FileShare",
     "Resource",
     "AIInteraction",
+    "DailyJournal",
 ]

@@ -45,8 +45,10 @@ class FileService:
 
     @staticmethod
     def get_multi_by_user(db: Session, user_id: int, skip: int = 0, limit: int = 100) -> List[FileMetadata]:
-        """List all files uploaded by user."""
-        return db.query(FileMetadata).filter(
+        """List all files uploaded by user with their shares."""
+        return db.query(FileMetadata).options(
+            joinedload(FileMetadata.shares)
+        ).filter(
             FileMetadata.user_id == user_id
         ).order_by(FileMetadata.created_at.desc()).offset(skip).limit(limit).all()
 

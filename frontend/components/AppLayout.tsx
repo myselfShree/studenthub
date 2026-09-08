@@ -1,10 +1,10 @@
-'use client';
+﻿'use client';
 
 import React, { useEffect } from 'react';
-import Navbar from '@/components/Navbar';
-import Sidebar from '@/components/Sidebar';
-import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+import Navbar from './Navbar';
+import Sidebar from './Sidebar';
 import { Loader2 } from 'lucide-react';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -19,9 +19,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0b0f19] flex flex-col items-center justify-center gap-3">
-        <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-        <span className="text-xs text-slate-400 font-medium tracking-wide">Loading workspace...</span>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-[#0d1117]">
+        <Loader2 className="animate-spin text-indigo-600 dark:text-indigo-400" size={32} />
       </div>
     );
   }
@@ -31,12 +30,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] flex flex-col">
+    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 dark:bg-[#0d1117] dark:text-slate-100 transition-colors">
       <Navbar />
-      <div className="flex flex-1">
+      <div className="flex-1 flex overflow-hidden">
         <Sidebar />
-        <main className="flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto overflow-y-auto">
-          {children}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto">{children}</div>
         </main>
       </div>
     </div>

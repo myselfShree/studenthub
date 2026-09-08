@@ -1,87 +1,69 @@
-'use client';
+﻿'use client';
 
 import React from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { 
-  GraduationCap, 
-  Sparkles, 
-  Search, 
-  User as UserIcon, 
+import { useTheme } from '@/context/ThemeContext';
+import {
+  GraduationCap,
+  Sun,
+  Moon,
   LogOut,
-  Bell
+  User,
+  CheckCircle2,
 } from 'lucide-react';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   return (
-    <header className="sticky top-0 z-30 h-16 border-b border-slate-800/80 bg-[#0b0f19]/80 backdrop-blur-md px-6 flex items-center justify-between">
-      {/* Brand Logo */}
+    <header className="sticky top-0 z-30 h-14 bg-white/90 dark:bg-[#161b22]/90 border-b border-slate-200 dark:border-[#30363d] backdrop-blur-md px-4 sm:px-6 flex items-center justify-between transition-colors">
       <div className="flex items-center gap-3">
         <Link href="/dashboard" className="flex items-center gap-2.5 group">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:scale-105 transition-transform">
-            <GraduationCap className="w-5 h-5 text-white" />
+          <div className="w-8 h-8 rounded-lg bg-indigo-600 dark:bg-indigo-500 flex items-center justify-center text-white shadow-sm transition-transform group-hover:scale-105">
+            <GraduationCap size={18} />
           </div>
-          <div>
-            <span className="text-base font-bold tracking-tight text-white flex items-center gap-1.5">
-              Student Hub
-              <span className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                v1.0
-              </span>
-            </span>
-          </div>
+          <span className="font-semibold text-slate-900 dark:text-white text-base tracking-tight">
+            StudentHub
+          </span>
         </Link>
       </div>
 
-      {/* Center AI Quick Badge / Search */}
-      <div className="hidden md:flex items-center gap-2 max-w-md w-full mx-8">
-        <div className="relative w-full">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Search notes, assignments, resources..."
-            className="w-full bg-slate-900/90 border border-slate-800 rounded-lg pl-10 pr-4 py-1.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
-          />
-        </div>
-      </div>
+      <div className="flex items-center gap-2 sm:gap-3">
+        {/* Day / Night Theme Toggle */}
+        <button
+          onClick={toggleTheme}
+          aria-label="Toggle Theme"
+          className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#21262d] border border-slate-200 dark:border-[#30363d] transition-colors"
+          title={theme === 'dark' ? 'Switch to Day Mode' : 'Switch to Night Mode'}
+        >
+          {theme === 'dark' ? (
+            <Sun size={16} className="text-amber-400" />
+          ) : (
+            <Moon size={16} className="text-indigo-600" />
+          )}
+        </button>
 
-      {/* User Actions */}
-      <div className="flex items-center gap-4">
-        {user ? (
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex flex-col items-end">
-              <span className="text-xs font-semibold text-slate-200">{user.name}</span>
-              <span className="text-[11px] text-slate-400">{user.email}</span>
-            </div>
-            
-            <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-indigo-400 font-semibold text-xs">
-              {user.name.charAt(0).toUpperCase()}
+        {user && (
+          <>
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-[#21262d] border border-slate-200 dark:border-[#30363d]">
+              <div className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-950 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                <User size={12} />
+              </div>
+              <span className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate max-w-[120px]">
+                {user.name}
+              </span>
             </div>
 
             <button
               onClick={logout}
-              title="Logout"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors ml-1"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 border border-transparent hover:border-red-200 dark:hover:border-red-900/50 transition-colors"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut size={14} />
+              <span className="hidden sm:inline">Sign Out</span>
             </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <Link
-              href="/login"
-              className="px-3.5 py-1.5 text-xs font-medium text-slate-300 hover:text-white transition-colors"
-            >
-              Sign In
-            </Link>
-            <Link
-              href="/register"
-              className="px-3.5 py-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors shadow-sm"
-            >
-              Get Started
-            </Link>
-          </div>
+          </>
         )}
       </div>
     </header>

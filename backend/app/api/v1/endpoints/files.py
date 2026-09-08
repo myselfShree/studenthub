@@ -33,14 +33,14 @@ async def upload_file(
     """
     return file_service.upload_file(db, user_id=current_user.id, upload_file=file)
 
-@router.get("", response_model=List[FileResponse])
+@router.get("", response_model=List[FileDetailResponse])
 def get_user_files(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """List all files uploaded by the authenticated student."""
+    """List all files uploaded by the authenticated student with active shares."""
     return file_service.get_multi_by_user(db, user_id=current_user.id, skip=skip, limit=limit)
 
 @router.get("/{file_id}", response_model=FileDetailResponse)
