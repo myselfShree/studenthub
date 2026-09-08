@@ -20,6 +20,13 @@ from app.schemas.note import (
     NoteUpdate,
     NoteResponse
 )
+from app.schemas.task import (
+    TaskBase,
+    TaskCreate,
+    TaskUpdate,
+    TaskStatusUpdate,
+    TaskResponse
+)
 
 __all__ = [
     "UserBase",
@@ -37,4 +44,9 @@ __all__ = [
     "NoteCreate",
     "NoteUpdate",
     "NoteResponse",
+    "TaskBase",
+    "TaskCreate",
+    "TaskUpdate",
+    "TaskStatusUpdate",
+    "TaskResponse",
 ]
