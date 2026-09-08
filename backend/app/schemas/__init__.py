@@ -55,6 +55,12 @@ from app.schemas.ai import (
     AIExplainResponse,
     AIInteractionResponse
 )
+from app.schemas.resource import (
+    ResourceBase,
+    ResourceCreate,
+    ResourceUpdate,
+    ResourceResponse
+)
 
 __all__ = [
     "UserBase",
@@ -99,4 +105,8 @@ __all__ = [
     "AIQuizResponse",
     "AIExplainResponse",
     "AIInteractionResponse",
+    "ResourceBase",
+    "ResourceCreate",
+    "ResourceUpdate",
+    "ResourceResponse",
 ]
