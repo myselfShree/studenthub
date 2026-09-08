@@ -27,6 +27,15 @@ from app.schemas.task import (
     TaskStatusUpdate,
     TaskResponse
 )
+from app.schemas.habit import (
+    HabitBase,
+    HabitCreate,
+    HabitUpdate,
+    HabitResponse,
+    HabitWithStatsResponse,
+    HabitRecordCreate,
+    HabitRecordResponse
+)
 
 __all__ = [
     "UserBase",
@@ -49,4 +58,11 @@ __all__ = [
     "TaskUpdate",
     "TaskStatusUpdate",
     "TaskResponse",
+    "HabitBase",
+    "HabitCreate",
+    "HabitUpdate",
+    "HabitResponse",
+    "HabitWithStatsResponse",
+    "HabitRecordCreate",
+    "HabitRecordResponse",
 ]
