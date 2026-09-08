@@ -43,6 +43,18 @@ from app.schemas.file import (
     PublicFileShareInfo,
     FileDetailResponse
 )
+from app.schemas.ai import (
+    AISummarizeRequest,
+    AIKeyPointsRequest,
+    AIQuizRequest,
+    AIExplainRequest,
+    AISummaryResponse,
+    AIKeyPointsResponse,
+    AIQuizQuestion,
+    AIQuizResponse,
+    AIExplainResponse,
+    AIInteractionResponse
+)
 
 __all__ = [
     "UserBase",
@@ -77,4 +89,14 @@ __all__ = [
     "FileShareResponse",
     "PublicFileShareInfo",
     "FileDetailResponse",
+    "AISummarizeRequest",
+    "AIKeyPointsRequest",
+    "AIQuizRequest",
+    "AIExplainRequest",
+    "AISummaryResponse",
+    "AIKeyPointsResponse",
+    "AIQuizQuestion",
+    "AIQuizResponse",
+    "AIExplainResponse",
+    "AIInteractionResponse",
 ]
