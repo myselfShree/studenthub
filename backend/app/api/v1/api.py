@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import health, auth, subjects, notes, tasks, habits
+from app.api.v1.endpoints import health, auth, subjects, notes, tasks, habits, files
 
 api_router = APIRouter()
 
@@ -10,3 +10,4 @@ api_router.include_router(subjects.router, prefix="/subjects", tags=["Subjects"]
 api_router.include_router(notes.router, prefix="/notes", tags=["Notes"])
 api_router.include_router(tasks.router, prefix="/tasks", tags=["Tasks"])
 api_router.include_router(habits.router, prefix="/habits", tags=["Habits"])
+api_router.include_router(files.router, prefix="/files", tags=["Files & QR Sharing"])

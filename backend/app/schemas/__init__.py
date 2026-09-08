@@ -36,6 +36,13 @@ from app.schemas.habit import (
     HabitRecordCreate,
     HabitRecordResponse
 )
+from app.schemas.file import (
+    FileResponse,
+    FileShareCreate,
+    FileShareResponse,
+    PublicFileShareInfo,
+    FileDetailResponse
+)
 
 __all__ = [
     "UserBase",
@@ -65,4 +72,9 @@ __all__ = [
     "HabitWithStatsResponse",
     "HabitRecordCreate",
     "HabitRecordResponse",
+    "FileResponse",
+    "FileShareCreate",
+    "FileShareResponse",
+    "PublicFileShareInfo",
+    "FileDetailResponse",
 ]
