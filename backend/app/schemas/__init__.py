@@ -61,6 +61,12 @@ from app.schemas.resource import (
     ResourceUpdate,
     ResourceResponse
 )
+from app.schemas.dashboard import (
+    MetricCounts,
+    TaskDashboardSummary,
+    HabitDashboardSummary,
+    DashboardOverviewResponse
+)
 
 __all__ = [
     "UserBase",
@@ -109,4 +115,8 @@ __all__ = [
     "ResourceCreate",
     "ResourceUpdate",
     "ResourceResponse",
+    "MetricCounts",
+    "TaskDashboardSummary",
+    "HabitDashboardSummary",
+    "DashboardOverviewResponse",
 ]
