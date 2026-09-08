@@ -1,6 +1,6 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Any
 
 # File Metadata Response
 class FileResponse(BaseModel):
@@ -16,7 +16,16 @@ class FileResponse(BaseModel):
 # File Share Creation
 class FileShareCreate(BaseModel):
     expires_in_hours: Optional[int] = Field(None, ge=1, le=720, description="Expiration time in hours (1h - 30 days)")
+    expires_hours: Optional[int] = Field(None, ge=1, le=720, description="Alias for expires_in_hours")
     max_downloads: Optional[int] = Field(None, ge=1, le=1000, description="Max allowed downloads before link expires")
+
+    @model_validator(mode='before')
+    @classmethod
+    def normalize_hours(cls, values: Any) -> Any:
+        if isinstance(values, dict):
+            if values.get('expires_hours') and not values.get('expires_in_hours'):
+                values['expires_in_hours'] = values['expires_hours']
+        return values
 
 # File Share Response
 class FileShareResponse(BaseModel):
