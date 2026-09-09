@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -19,8 +19,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-[#0d1117]">
-        <Loader2 className="animate-spin text-indigo-600 dark:text-indigo-400" size={32} />
+      <div className="min-h-screen flex items-center justify-center bg-[#11120D]">
+        <Loader2 className="animate-spin text-[#8E9B7A]" size={28} />
       </div>
     );
   }
@@ -30,7 +30,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 dark:bg-[#0d1117] dark:text-slate-100 transition-colors">
+    <div className="min-h-screen flex flex-col bg-[#11120D] text-[#FFFBF4] transition-colors">
       <Navbar />
       <div className="flex-1 flex overflow-hidden">
         <Sidebar />

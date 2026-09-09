@@ -1,55 +1,206 @@
-﻿@tailwind base;
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 15, 23, 42;
-  --background-rgb: 248, 250, 252;
+/* -------------------------------------------------------------------------- */
+/*  STUDENT HUB GLOBAL DESIGN SYSTEM                                          */
+/*  Palette: Warm Neutral / Architectural Editorial                           */
+/* -------------------------------------------------------------------------- */
+
+@font-face {
+  font-family: 'OffBit';
+  src: local('OffBit'),
+       local('OffBit-Regular'),
+       local('OffBit 101'),
+       url('/fonts/OffBit-Regular.woff2') format('woff2'),
+       url('/fonts/OffBit.woff2') format('woff2');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
 }
 
-html.dark {
-  --foreground-rgb: 241, 245, 249;
-  --background-rgb: 13, 17, 23;
+:root {
+  /* Global Design Tokens */
+  --color-bg-primary: #11120D;
+  --color-bg-surface: #1C1C17;
+  --color-bg-elevated: #24241E;
+  --color-text-primary: #FFFBF4;
+  --color-text-secondary: #D8CFBC;
+  --color-text-muted: #8D8777;
+  --color-border: #36362F;
+  --color-border-subtle: #262621;
+  --color-olive: #565449;
+  --color-sage: #8E9B7A;
+  --color-sage-subtle: #282F24;
+}
+
+html {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background-color: rgb(var(--background-rgb));
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Crisp Clean Panel Design (No AI Neon Glow) */
+/* Typography Utility Classes */
+.font-display {
+  font-family: 'OffBit', 'Cinzel', 'Playfair Display', Georgia, serif;
+  letter-spacing: -0.01em;
+}
+
+/* Reusable Global Component Classes */
+.sh-card {
+  background-color: #1C1C17;
+  border: 1px solid #36362F;
+  border-radius: 8px;
+  color: #FFFBF4;
+}
+
+.sh-card-elevated {
+  background-color: #24241E;
+  border: 1px solid #36362F;
+  border-radius: 8px;
+  color: #FFFBF4;
+}
+
+/* Glass panel backward compatibility mapped to design system */
 .glass-panel {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  background-color: #1C1C17 !important;
+  border: 1px solid #36362F !important;
+  border-radius: 8px !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.4) !important;
+  color: #FFFBF4 !important;
 }
 
 .dark .glass-panel {
-  background: #161b22;
-  border: 1px solid #30363d;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
+  background-color: #1C1C17 !important;
+  border: 1px solid #36362F !important;
+  border-radius: 8px !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.4) !important;
+  color: #FFFBF4 !important;
 }
 
-/* Custom Scrollbar */
+/* Button Variants */
+.sh-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background-color: #FFFBF4;
+  color: #11120D;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  border: 1px solid #FFFBF4;
+  transition: all 0.15s ease-in-out;
+}
+.sh-btn-primary:hover {
+  background-color: #D8CFBC;
+  border-color: #D8CFBC;
+}
+
+.sh-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background-color: #1C1C17;
+  color: #FFFBF4;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  border: 1px solid #36362F;
+  transition: all 0.15s ease-in-out;
+}
+.sh-btn-secondary:hover {
+  background-color: #24241E;
+  border-color: #565449;
+}
+
+.sh-btn-sage {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background-color: #282F24;
+  color: #8E9B7A;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  border: 1px solid rgba(142, 155, 122, 0.4);
+  transition: all 0.15s ease-in-out;
+}
+.sh-btn-sage:hover {
+  background-color: rgba(142, 155, 122, 0.2);
+  border-color: #8E9B7A;
+}
+
+/* Form Input Styling */
+.sh-input {
+  width: 100%;
+  background-color: #11120D;
+  border: 1px solid #36362F;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  color: #FFFBF4;
+  outline: none;
+  transition: border-color 0.15s ease-in-out;
+}
+.sh-input::placeholder {
+  color: #8D8777;
+}
+.sh-input:focus {
+  border-color: #8E9B7A;
+}
+
+/* Status Badges */
+.sh-badge-sage {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  border-radius: 4px;
+  background-color: #282F24;
+  color: #8E9B7A;
+  border: 1px solid rgba(142, 155, 122, 0.3);
+}
+
+.sh-badge-olive {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  border-radius: 4px;
+  background-color: #24241E;
+  color: #D8CFBC;
+  border: 1px solid #36362F;
+}
+
+/* Custom Scrollbar - Warm Neutral Palette */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #11120D;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 9999px;
-}
-.dark ::-webkit-scrollbar-thumb {
-  background: #30363d;
+  background: #36362F;
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: #484f58;
+  background: #565449;
 }
