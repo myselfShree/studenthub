@@ -189,6 +189,26 @@ body {
   border: 1px solid #36362F;
 }
 
+/* ── Landing Page Motion Animations ── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+.typewriter-cursor {
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-10px); }
+}
+
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0px) rotate(-1deg); }
+  50%       { transform: translateY(-14px) rotate(1deg); }
+}
+
 /* Custom Scrollbar - Warm Neutral Palette */
 ::-webkit-scrollbar {
   width: 6px;
