@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { motion } from 'framer-motion';
 import {
   LayoutDashboard,
   BookOpen,
@@ -14,19 +15,19 @@ import {
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/notes', label: 'Notes & AI', icon: BookOpen },
-  { href: '/tasks', label: 'Tasks', icon: CheckSquare },
-  { href: '/habits', label: 'Habits & Routine', icon: Flame },
-  { href: '/files', label: 'File Sharing', icon: QrCode },
-  { href: '/resources', label: 'Resources', icon: Bookmark },
+  { href: '/notes',     label: 'Notes & AI', icon: BookOpen },
+  { href: '/tasks',     label: 'Tasks',      icon: CheckSquare },
+  { href: '/habits',    label: 'Habits & Routine', icon: Flame },
+  { href: '/files',     label: 'File Sharing', icon: QrCode },
+  { href: '/resources', label: 'Resources',  icon: Bookmark },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-56 flex-shrink-0 bg-[#1C1C17] border-r border-[#36362F] p-3 flex flex-col justify-between hidden md:flex min-h-[calc(100vh-3.5rem)] transition-colors">
-      <div className="space-y-1">
+    <aside className="w-56 flex-shrink-0 bg-[#1C1C17] border-r border-[#36362F] p-3 flex flex-col justify-between hidden md:flex min-h-[calc(100vh-3.5rem)]">
+      <div className="space-y-0.5">
         <p className="px-3 py-2 text-[10px] font-semibold text-[#8D8777] uppercase tracking-wider font-mono">
           Workspace
         </p>
@@ -37,17 +38,28 @@ export default function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-colors ${
-                isActive
-                  ? 'bg-[#24241E] text-[#FFFBF4] border border-[#565449]'
-                  : 'text-[#D8CFBC] hover:text-[#FFFBF4] hover:bg-[#24241E]/60 border border-transparent'
-              }`}
+              className="relative flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-colors group"
+              style={{ color: isActive ? '#FFFBF4' : '#D8CFBC' }}
             >
-              <Icon 
-                size={15} 
-                className={isActive ? 'text-[#8E9B7A]' : 'text-[#8D8777]'} 
-              />
-              <span>{item.label}</span>
+              {/* Animated active pill via layoutId */}
+              {isActive && (
+                <motion.div
+                  layoutId="sidebar-active-pill"
+                  className="absolute inset-0 bg-[#24241E] border border-[#565449] rounded-md"
+                  transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+                />
+              )}
+              {!isActive && (
+                <div className="absolute inset-0 rounded-md opacity-0 group-hover:opacity-100 bg-[#24241E]/60 transition-opacity duration-150" />
+              )}
+              <span className="relative z-10">
+                <Icon
+                  size={15}
+                  strokeWidth={1.75}
+                  className={isActive ? 'text-[#8E9B7A]' : 'text-[#8D8777] group-hover:text-[#D8CFBC] transition-colors'}
+                />
+              </span>
+              <span className="relative z-10">{item.label}</span>
             </Link>
           );
         })}
