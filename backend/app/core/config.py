@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 from pathlib import Path
+import re
 
 # Project root directory
 BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
@@ -24,12 +25,18 @@ class Settings(BaseSettings):
     @property
     def sync_database_url(self) -> str:
         if self.DATABASE_URL:
-            url = self.DATABASE_URL
-            # Normalize driver protocol for SQLAlchemy
+            url = self.DATABASE_URL.strip()
+            # 1. Normalize protocol to postgresql+psycopg2://
             if url.startswith("postgres://"):
                 url = url.replace("postgres://", "postgresql+psycopg2://", 1)
             elif url.startswith("postgresql://") and not url.startswith("postgresql+"):
                 url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
+
+            # 2. Clean Neon query params (remove channel_binding if present as it can cause psycopg2 negotiation errors)
+            if "channel_binding" in url:
+                url = re.sub(r'([?&])channel_binding=[^&]*', '', url)
+                url = url.replace('?&', '?').rstrip('?').rstrip('&')
+
             return url
         return f"postgresql+psycopg2://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
