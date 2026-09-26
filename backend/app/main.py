@@ -2,10 +2,13 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from contextlib import asynccontextmanager
 import logging
 
 from app.core.config import settings
+from app.core.database import engine, Base
 from app.api.v1.api import api_router
+import app.models  # Ensure all SQLAlchemy models are registered
 
 # Setup logging
 logging.basicConfig(
@@ -14,6 +17,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger("studenthub")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Safe automatic schema creation on server startup if needed
+    try:
+        logger.info("Initializing database schema...")
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database schema initialized successfully.")
+    except Exception as e:
+        logger.warning(f"Database schema initialization check: {e}")
+    yield
+
 # Initialize FastAPI application
 app = FastAPI(
     title=settings.APP_NAME,
@@ -21,7 +35,8 @@ app = FastAPI(
     version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
-    openapi_url=f"{settings.API_V1_STR}/openapi.json"
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    lifespan=lifespan
 )
 
 # Configure CORS Middleware
