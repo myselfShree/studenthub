@@ -1,129 +1,142 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import Link from 'next/link';
-import { useAuth } from '@/context/AuthContext';
-import StudentHubLogo from '@/components/StudentHubLogo';
-import { Lock, Mail, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
+
+const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export default function LoginPage() {
-  const { login } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
-      await login(email, password);
-    } catch (err: any) {
-      setError(err.message || 'Login failed. Please verify credentials.');
+      const res = await fetch(`${API}/api/v1/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.detail ?? "Login failed. Please try again.");
+        return;
+      }
+
+      localStorage.setItem("studenthub_token", data.access_token);
+      localStorage.setItem("studenthub_user", JSON.stringify(data.user));
+      router.push("/dashboard");
+    } catch {
+      setError("Unable to connect. Please check your connection.");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-[#11120D] text-[#FFFBF4] flex items-center justify-center p-6 relative overflow-hidden">
-      {/* Background Subtle Warm Radial Glow */}
-      <div 
-        className="fixed inset-0 pointer-events-none"
-        style={{
-          background: 'radial-gradient(circle at 50% 45%, rgba(86,84,73,0.15) 0%, rgba(17,18,13,0.8) 70%, #11120D 100%)',
-        }}
-      />
-
-      <motion.div 
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-        className="max-w-md w-full sh-glass-strong rounded-2xl p-8 border border-[#36362F] relative z-10 space-y-6 shadow-2xl"
-      >
-        {/* Brand Header */}
-        <div className="text-center space-y-3">
-          <div className="flex justify-center mb-2">
-            <StudentHubLogo size={42} textSize="text-base font-semibold" />
-          </div>
-          <h1 className="text-xl font-bold tracking-tight text-[#FFFBF4] font-display">Welcome Back</h1>
-          <p className="text-xs text-[#8D8777]">Enter your credentials to access your academic workspace</p>
+    <div className="min-h-screen bg-[#11120D] flex items-center justify-center px-4">
+      <div className="w-full max-w-sm">
+        {/* Logo */}
+        <div className="mb-8 text-center">
+          <span className="text-[#F0EDE6] text-2xl font-bold tracking-tight">
+            Student Hub
+          </span>
+          <p className="mt-1 text-sm text-[#8D8777]">Sign in to continue</p>
         </div>
 
-        {/* Error Notification */}
-        {error && (
-          <motion.div 
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="sh-alert-danger"
-          >
-            <AlertCircle size={15} className="shrink-0" strokeWidth={1.75} />
-            <span>{error}</span>
-          </motion.div>
-        )}
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          className="sh-glass rounded-2xl border border-[#36362F] p-8 space-y-5"
+        >
+          {/* Email */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-[#D8CFBC]">Email Address</label>
-            <div className="relative">
-              <Mail className="w-4 h-4 text-[#8D8777] absolute left-3.5 top-1/2 -translate-y-1/2" strokeWidth={1.75} />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="student@university.edu"
-                className="sh-input pl-10 pr-4 py-2.5"
-              />
-            </div>
+            <label className="block text-xs font-medium text-[#8D8777] uppercase tracking-widest">
+              Email
+            </label>
+            <input
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-[#11120D] border border-[#36362F] rounded-lg px-4 py-3
+                         text-[#F0EDE6] text-sm placeholder:text-[#57564F]
+                         focus:outline-none focus:border-[#8E9B7A] transition-colors"
+              placeholder="you@example.com"
+            />
           </div>
 
+          {/* Password */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-[#D8CFBC]">Password</label>
+            <label className="block text-xs font-medium text-[#8D8777] uppercase tracking-widest">
+              Password
+            </label>
             <div className="relative">
-              <Lock className="w-4 h-4 text-[#8D8777] absolute left-3.5 top-1/2 -translate-y-1/2" strokeWidth={1.75} />
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-[#11120D] border border-[#36362F] rounded-lg px-4 py-3 pr-11
+                           text-[#F0EDE6] text-sm placeholder:text-[#57564F]
+                           focus:outline-none focus:border-[#8E9B7A] transition-colors"
                 placeholder="••••••••"
-                className="sh-input pl-10 pr-4 py-2.5"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute inset-y-0 right-3 flex items-center text-[#57564F] hover:text-[#8D8777] transition-colors"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            <div className="flex justify-end">
+              <Link
+                href="/forgot-password"
+                className="text-xs text-[#8D8777] hover:text-[#8E9B7A] transition-colors"
+              >
+                Forgot password?
+              </Link>
             </div>
           </div>
 
+          {/* Error */}
+          {error && (
+            <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-3">
+              {error}
+            </p>
+          )}
+
+          {/* Submit */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full sh-btn-primary py-2.5 mt-2 flex items-center justify-center gap-2"
+            className="sh-btn-primary w-full py-3 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin text-[#11120D]" strokeWidth={2} />
-                <span>Signing in...</span>
-              </>
-            ) : (
-              <>
-                <span>Sign In</span>
-                <ArrowRight className="w-4 h-4" strokeWidth={1.75} />
-              </>
-            )}
+            {loading ? "Signing in…" : "Sign in"}
           </button>
-        </form>
 
-        {/* Footer Link */}
-        <div className="text-center pt-2 text-xs text-[#8D8777]">
-          Don't have an account yet?{' '}
-          <Link href="/register" className="text-[#8E9B7A] hover:text-[#FFFBF4] font-medium transition-colors">
-            Create account
-          </Link>
-        </div>
-      </motion.div>
+          <p className="text-center text-xs text-[#57564F]">
+            No account?{" "}
+            <Link href="/register" className="text-[#8E9B7A] hover:underline">
+              Create one
+            </Link>
+          </p>
+        </form>
+      </div>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import model_validator
 from typing import Optional
 from pathlib import Path
 import re
@@ -12,7 +13,9 @@ class Settings(BaseSettings):
     APP_ENV: str = "development"
     DEBUG: bool = True
     API_V1_STR: str = "/api/v1"
-    SECRET_KEY: str = "studenthub_super_secret_jwt_key_2026_change_in_production"
+
+    # SECRET_KEY is required — no default. Will raise at startup if missing.
+    SECRET_KEY: str
 
     # Database
     POSTGRES_SERVER: str = "localhost"
@@ -53,6 +56,32 @@ class Settings(BaseSettings):
 
     # CORS
     FRONTEND_URL: str = "http://localhost:3000"
+
+    # Email (Brevo)
+    BREVO_API_KEY: Optional[str] = None
+    EMAIL_FROM: str = "noreply@studenthub.app"
+    EMAIL_FROM_NAME: str = "Student Hub"
+
+    # Password Reset
+    PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 30
+
+    # Rate Limiting (requests per window)
+    RATE_LIMIT_LOGIN: str = "5/minute"
+    RATE_LIMIT_REGISTER: str = "3/minute"
+    RATE_LIMIT_FORGOT_PASSWORD: str = "3/minute"
+
+    # Account Lockout
+    MAX_FAILED_LOGIN_ATTEMPTS: int = 5
+    ACCOUNT_LOCKOUT_MINUTES: int = 15
+
+    @model_validator(mode="after")
+    def _require_secret_key(self):
+        if not self.SECRET_KEY or self.SECRET_KEY.strip() == "":
+            raise ValueError(
+                "SECRET_KEY environment variable is required and must not be empty. "
+                "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+            )
+        return self
 
     model_config = SettingsConfigDict(
         env_file=str(BACKEND_DIR / ".env"),

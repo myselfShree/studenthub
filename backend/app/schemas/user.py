@@ -40,3 +40,12 @@ class Token(BaseModel):
 # Token Data embedded in JWT sub
 class TokenData(BaseModel):
     user_id: Optional[int] = None
+
+# Forgot-password request
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr = Field(..., examples=["alex@studenthub.dev"])
+
+# Reset-password request
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(..., description="Single-use reset token from the email link")
+    new_password: str = Field(..., min_length=6, max_length=100, description="New password (min 6 characters)")

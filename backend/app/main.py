@@ -3,12 +3,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from contextlib import asynccontextmanager
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import logging
 
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.api.v1.api import api_router
 import app.models  # Ensure all SQLAlchemy models are registered
+
+# Rate limiter — shared instance imported by route modules
+limiter = Limiter(key_func=get_remote_address, default_limits=[])
 
 # Setup logging
 logging.basicConfig(
@@ -38,6 +44,10 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     lifespan=lifespan
 )
+
+# Attach rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Configure CORS Middleware
 origins = [
