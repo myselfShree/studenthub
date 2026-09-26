@@ -1,12 +1,15 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { api } from '@/lib/api';
 import {
   Upload, FileText, Share2, Download, Trash2, X, Copy,
-  Check, QrCode, Link2, Loader2, FolderOpen, AlertCircle
+  Check, QrCode, Link2, FolderOpen, AlertCircle
 } from 'lucide-react';
+import QRCode from 'react-qr-code';
+import { SkeletonRow } from '@/components/Skeleton';
+import EmptyState from '@/components/EmptyState';
 
 interface FileItem {
   id: number;
@@ -42,7 +45,7 @@ export default function FilesPage() {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [shareModal, setShareModal] = useState<{ file: FileItem; token?: string } | null>(null);
-  const [qrModal, setQrModal] = useState<string | null>(null);
+  const [qrModalToken, setQrModalToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [shareForm, setShareForm] = useState({ expires_hours: '24', max_downloads: '' });
   const [sharingFile, setSharingFile] = useState(false);
@@ -116,30 +119,34 @@ export default function FilesPage() {
     }
   };
 
+  const getFullShareUrl = (token: string) => {
+    if (typeof window !== 'undefined') {
+      return `${window.location.origin}/share/${token}`;
+    }
+    return `/share/${token}`;
+  };
+
   const copyLink = (token: string) => {
-    const link = `${window.location.origin}/share/${token}`;
+    const link = getFullShareUrl(token);
     navigator.clipboard.writeText(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const shareLink = (token: string) => `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/share/${token}`;
-  const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-
   return (
     <AppLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-slate-200 dark:border-[#30363d]">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-[#36362F]">
           <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">QR File Sharing</h1>
-            <p className="text-slate-600 dark:text-slate-400 text-xs mt-0.5">Upload notes, PDFs, or assignments and generate secure QR codes</p>
+            <h1 className="text-xl font-bold text-[#FFFBF4] tracking-tight font-display">QR File Sharing</h1>
+            <p className="text-[#8D8777] text-xs mt-0.5">Upload notes, PDFs, or assignments and generate secure scannable QR codes</p>
           </div>
         </div>
 
         {error && (
-          <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 text-xs">
-            <AlertCircle size={14} className="flex-shrink-0" />
+          <div className="sh-alert-danger">
+            <AlertCircle size={15} className="shrink-0" strokeWidth={1.75} />
             <span>{error}</span>
           </div>
         )}
@@ -150,108 +157,111 @@ export default function FilesPage() {
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onClick={() => fileInputRef.current?.click()}
-          className={`rounded-xl border-2 border-dashed transition-all duration-150 cursor-pointer p-8 flex flex-col items-center justify-center gap-3 ${
+          className={`rounded-xl border-2 border-dashed transition-all duration-200 cursor-pointer p-8 flex flex-col items-center justify-center gap-3 ${
             dragOver
-              ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/30'
-              : 'border-slate-300 dark:border-[#30363d] bg-white dark:bg-[#161b22] hover:border-slate-400 dark:hover:border-slate-600'
+              ? 'border-[#8E9B7A] bg-[#282F24]/40'
+              : 'border-[#36362F] bg-[#1C1C17] hover:border-[#565449] hover:bg-[#24241E]/40'
           }`}
         >
           <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileInput} />
           {uploading ? (
-            <>
-              <Loader2 className="animate-spin text-indigo-600 dark:text-indigo-400" size={28} />
-              <p className="text-slate-700 dark:text-slate-300 text-xs font-medium">Uploading file...</p>
-            </>
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-8 h-8 rounded-full border-2 border-[#8E9B7A] border-t-transparent animate-spin" />
+              <p className="text-[#FFFBF4] text-xs font-medium">Uploading file...</p>
+            </div>
           ) : (
             <>
-              <div className="p-2.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">
-                <Upload size={20} />
+              <div className="p-3 rounded-xl bg-[#24241E] border border-[#36362F] text-[#8E9B7A]">
+                <Upload size={20} strokeWidth={1.75} />
               </div>
               <div className="text-center">
-                <p className="text-slate-900 dark:text-white text-xs font-medium">Click or drag file here to upload</p>
-                <p className="text-slate-600 dark:text-slate-400 text-[11px] mt-0.5">Supports PDF, DOCX, Code, Images, ZIP</p>
+                <p className="text-[#FFFBF4] text-xs font-semibold">Click or drag file here to upload</p>
+                <p className="text-[#8D8777] text-[11px] mt-0.5">Supports PDF, DOCX, Code, Images, ZIP</p>
               </div>
             </>
           )}
         </div>
 
-        {/* Files Table */}
+        {/* Files List */}
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="animate-spin text-indigo-600 dark:text-indigo-400" size={24} />
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} />)}
           </div>
         ) : files.length === 0 ? (
-          <div className="glass-panel rounded-xl p-12 text-center">
-            <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-[#21262d] text-slate-600 dark:text-slate-400 flex items-center justify-center mx-auto mb-3">
-              <FolderOpen size={20} />
-            </div>
-            <p className="text-slate-900 dark:text-white text-xs font-medium">No files uploaded yet</p>
-            <p className="text-slate-600 dark:text-slate-400 text-[11px] mt-1">Uploaded files and QR links will appear here.</p>
-          </div>
+          <EmptyState
+            icon={FolderOpen}
+            title="No files uploaded yet"
+            description="Uploaded study notes, assignments, and generated QR links will appear here."
+            action={{
+              label: 'Upload File',
+              onClick: () => fileInputRef.current?.click(),
+            }}
+          />
         ) : (
-          <div className="glass-panel rounded-xl overflow-hidden">
-            <div className="grid grid-cols-12 gap-4 px-4 py-2.5 border-b border-slate-200 dark:border-[#30363d] bg-slate-50 dark:bg-[#1c2128] text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+          <div className="sh-card rounded-xl overflow-hidden border border-[#36362F]">
+            <div className="grid grid-cols-12 gap-4 px-4 py-2.5 border-b border-[#36362F] bg-[#24241E] text-[11px] font-semibold text-[#8D8777]">
               <div className="col-span-5">File</div>
               <div className="col-span-2">Size</div>
               <div className="col-span-2">Date</div>
               <div className="col-span-3 text-right">Actions</div>
             </div>
-            <div className="divide-y divide-slate-200 dark:divide-[#30363d]">
+            <div className="divide-y divide-[#36362F]">
               {files.map((file) => {
                 const shares = file.shares || [];
                 const activeShare = shares.find((s) => s.is_active) || shares[0];
                 return (
-                  <div key={file.id} className="grid grid-cols-12 gap-4 px-4 py-3 items-center hover:bg-slate-50/80 dark:hover:bg-[#1c2128]/50 transition-colors">
+                  <div key={file.id} className="grid grid-cols-12 gap-4 px-4 py-3 items-center hover:bg-[#24241E]/40 transition-colors">
                     <div className="col-span-5 flex items-center gap-2.5 min-w-0">
-                      <div className="p-2 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex-shrink-0">
-                        <FileText size={15} />
+                      <div className="p-2 rounded-md bg-[#24241E] text-[#8E9B7A] flex-shrink-0">
+                        <FileText size={15} strokeWidth={1.75} />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-xs font-medium text-slate-900 dark:text-white truncate">{file.filename}</p>
+                        <p className="text-xs font-medium text-[#FFFBF4] truncate">{file.filename}</p>
                         {activeShare && (
-                          <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5">
+                          <p className="text-[10px] text-[#8E9B7A] mt-0.5 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#8E9B7A]" />
                             Active QR ({activeShare.download_count} dl)
                           </p>
                         )}
                       </div>
                     </div>
-                    <div className="col-span-2 text-xs text-slate-600 dark:text-slate-400">{formatBytes(file.file_size)}</div>
-                    <div className="col-span-2 text-xs text-slate-600 dark:text-slate-400">{formatDate(file.created_at)}</div>
+                    <div className="col-span-2 text-xs text-[#8D8777]">{formatBytes(file.file_size)}</div>
+                    <div className="col-span-2 text-xs text-[#8D8777]">{formatDate(file.created_at)}</div>
                     <div className="col-span-3 flex items-center justify-end gap-1.5">
                       <button
                         onClick={() => setShareModal({ file })}
-                        className="px-2 py-1 rounded text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors flex items-center gap-1"
+                        className="sh-btn-secondary px-2 py-1 text-xs gap-1"
                         title="Create or View Share Link"
                       >
-                        <Share2 size={13} />
+                        <Share2 size={13} strokeWidth={1.75} />
                         <span className="hidden sm:inline">Share</span>
                       </button>
 
                       {activeShare && (
                         <>
                           <button
-                            onClick={() => setQrModal(activeShare.share_token)}
-                            className="p-1.5 rounded text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#21262d] transition-colors"
-                            title="Show QR Code"
+                            onClick={() => setQrModalToken(activeShare.share_token)}
+                            className="p-1.5 rounded-md text-[#D8CFBC] hover:text-[#FFFBF4] hover:bg-[#24241E] border border-transparent hover:border-[#36362F] transition-colors"
+                            title="Show Scannable QR Code"
                           >
-                            <QrCode size={14} />
+                            <QrCode size={14} strokeWidth={1.75} />
                           </button>
                           <button
                             onClick={() => copyLink(activeShare.share_token)}
-                            className="p-1.5 rounded text-slate-600 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-[#21262d] transition-colors"
+                            className="p-1.5 rounded-md text-[#D8CFBC] hover:text-[#8E9B7A] hover:bg-[#24241E] border border-transparent hover:border-[#36362F] transition-colors"
                             title="Copy Share Link"
                           >
-                            {copied ? <Check size={14} className="text-emerald-500" /> : <Link2 size={14} />}
+                            {copied ? <Check size={14} className="text-[#8E9B7A]" strokeWidth={2} /> : <Link2 size={14} strokeWidth={1.75} />}
                           </button>
                         </>
                       )}
 
                       <button
                         onClick={() => handleDelete(file.id)}
-                        className="p-1.5 rounded text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                        className="p-1.5 rounded-md text-[#8D8777] hover:text-[#C76A5E] hover:bg-[#C76A5E]/10 transition-colors"
                         title="Delete file"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={14} strokeWidth={1.75} />
                       </button>
                     </div>
                   </div>
@@ -264,48 +274,48 @@ export default function FilesPage() {
 
       {/* Share Modal */}
       {shareModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="glass-panel rounded-xl p-5 w-full max-w-sm">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#30363d] mb-4">
-              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Share File via QR Link</h2>
-              <button onClick={() => setShareModal(null)} className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
-                <X size={16} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+          <div className="sh-glass-strong rounded-2xl p-6 w-full max-w-sm border border-[#36362F] shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-[#36362F] mb-4">
+              <h2 className="text-sm font-semibold text-[#FFFBF4]">Share File via QR Link</h2>
+              <button onClick={() => setShareModal(null)} className="text-[#8D8777] hover:text-[#FFFBF4]">
+                <X size={16} strokeWidth={1.75} />
               </button>
             </div>
 
-            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 dark:bg-[#1c2128] border border-slate-200 dark:border-[#30363d] mb-4">
-              <FileText size={15} className="text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
-              <span className="text-xs text-slate-800 dark:text-slate-200 font-medium truncate">{shareModal.file.filename}</span>
+            <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-[#11120D] border border-[#36362F] mb-4">
+              <FileText size={15} className="text-[#8E9B7A] flex-shrink-0" strokeWidth={1.75} />
+              <span className="text-xs text-[#D8CFBC] font-medium truncate">{shareModal.file.filename}</span>
             </div>
 
             {!shareModal.token ? (
               <div className="space-y-3">
                 <div>
-                  <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">Expiration (Hours)</label>
+                  <label className="block text-[11px] font-medium text-[#8D8777] mb-1">Expiration (Hours)</label>
                   <input
                     type="number"
                     min="1"
                     value={shareForm.expires_hours}
                     onChange={(e) => setShareForm({ ...shareForm, expires_hours: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-[#30363d] bg-white dark:bg-[#0d1117] text-slate-900 dark:text-white outline-none focus:border-indigo-500"
+                    className="sh-input"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">Max Downloads (Optional)</label>
+                  <label className="block text-[11px] font-medium text-[#8D8777] mb-1">Max Downloads (Optional)</label>
                   <input
                     type="number"
                     min="1"
                     placeholder="Unlimited"
                     value={shareForm.max_downloads}
                     onChange={(e) => setShareForm({ ...shareForm, max_downloads: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-[#30363d] bg-white dark:bg-[#0d1117] text-slate-900 dark:text-white outline-none focus:border-indigo-500"
+                    className="sh-input"
                   />
                 </div>
                 <div className="flex gap-2 pt-2">
                   <button
                     type="button"
                     onClick={() => setShareModal(null)}
-                    className="flex-1 py-1.5 text-xs font-medium rounded-lg border border-slate-300 dark:border-[#30363d] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#21262d]"
+                    className="sh-btn-secondary flex-1"
                   >
                     Cancel
                   </button>
@@ -313,7 +323,7 @@ export default function FilesPage() {
                     type="button"
                     onClick={handleShare}
                     disabled={sharingFile}
-                    className="flex-1 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors disabled:opacity-50"
+                    className="sh-btn-primary flex-1 disabled:opacity-50"
                   >
                     {sharingFile ? 'Generating...' : 'Generate Link'}
                   </button>
@@ -321,33 +331,33 @@ export default function FilesPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-[#0d1117] border border-slate-200 dark:border-[#30363d]">
-                  <p className="text-[10px] text-slate-600 dark:text-slate-400 mb-1">Public Share Link:</p>
+                <div className="p-2.5 rounded-lg bg-[#11120D] border border-[#36362F]">
+                  <p className="text-[10px] text-[#8D8777] mb-1">Public Share Link:</p>
                   <div className="flex items-center gap-1.5">
                     <input
                       readOnly
-                      value={shareLink(shareModal.token)}
-                      className="flex-1 bg-transparent text-[11px] font-mono text-slate-800 dark:text-slate-200 outline-none truncate"
+                      value={getFullShareUrl(shareModal.token)}
+                      className="flex-1 bg-transparent text-[11px] font-mono text-[#D8CFBC] outline-none truncate"
                     />
                     <button
                       onClick={() => copyLink(shareModal.token!)}
-                      className="p-1 rounded hover:bg-slate-200 dark:hover:bg-[#21262d] text-slate-600 dark:text-slate-400"
+                      className="p-1 rounded hover:bg-[#24241E] text-[#8D8777]"
                     >
-                      {copied ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+                      {copied ? <Check size={13} className="text-[#8E9B7A]" strokeWidth={2} /> : <Copy size={13} strokeWidth={1.75} />}
                     </button>
                   </div>
                 </div>
 
                 <button
-                  onClick={() => setQrModal(shareModal.token!)}
-                  className="w-full py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 text-xs font-medium hover:bg-indigo-50 dark:hover:bg-indigo-950/40 flex items-center justify-center gap-1.5"
+                  onClick={() => setQrModalToken(shareModal.token!)}
+                  className="sh-btn-sage w-full gap-1.5"
                 >
-                  <QrCode size={13} /> View QR Code
+                  <QrCode size={13} strokeWidth={1.75} /> View QR Code
                 </button>
 
                 <button
                   onClick={() => setShareModal(null)}
-                  className="w-full py-1.5 rounded-lg bg-slate-100 dark:bg-[#21262d] text-slate-700 dark:text-slate-300 text-xs font-medium hover:bg-slate-200 dark:hover:bg-[#30363d]"
+                  className="sh-btn-secondary w-full"
                 >
                   Done
                 </button>
@@ -357,26 +367,36 @@ export default function FilesPage() {
         </div>
       )}
 
-      {/* QR Code Modal */}
-      {qrModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="glass-panel rounded-xl p-5 w-full max-w-xs text-center">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#30363d] mb-4">
-              <h3 className="text-xs font-semibold text-slate-900 dark:text-white">QR Code</h3>
-              <button onClick={() => setQrModal(null)} className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
-                <X size={15} />
+      {/* QR Code Modal (Instant Client-side Rendered SVG) */}
+      {qrModalToken && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+          <div className="sh-glass-strong rounded-2xl p-6 w-full max-w-xs text-center border border-[#36362F] shadow-2xl">
+            <div className="flex items-center justify-between pb-2 border-b border-[#36362F] mb-4">
+              <h3 className="text-xs font-semibold text-[#FFFBF4]">Scannable QR Code</h3>
+              <button onClick={() => setQrModalToken(null)} className="text-[#8D8777] hover:text-[#FFFBF4]">
+                <X size={15} strokeWidth={1.75} />
               </button>
             </div>
-            <div className="p-4 bg-white rounded-lg inline-block border border-slate-200 dark:border-slate-700 mb-3 shadow-sm">
-              <img src={`${BASE}/files/shared/${qrModal}/qr`} alt="QR Code" className="w-44 h-44 object-contain mx-auto" />
+            
+            {/* Pure white solid container so all cameras can scan the QR code effortlessly */}
+            <div className="p-4 bg-white rounded-xl inline-block border border-[#36362F] mb-3 shadow-lg">
+              <QRCode
+                value={getFullShareUrl(qrModalToken)}
+                size={180}
+                style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                viewBox={`0 0 180 180`}
+              />
             </div>
-            <p className="text-[11px] text-slate-600 dark:text-slate-400 mb-3">Scan with any phone camera to access and download the file.</p>
-            <a
-              href={`${BASE}/files/shared/${qrModal}/download`}
-              className="w-full py-1.5 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
+
+            <p className="text-[11px] text-[#8D8777] mb-3">Scan with any phone camera to access and download the file immediately.</p>
+            
+            <button
+              onClick={() => copyLink(qrModalToken)}
+              className="sh-btn-primary w-full gap-1.5"
             >
-              <Download size={13} /> Download File
-            </a>
+              {copied ? <Check size={13} strokeWidth={2} /> : <Copy size={13} strokeWidth={1.75} />}
+              <span>{copied ? 'Link Copied' : 'Copy Direct Link'}</span>
+            </button>
           </div>
         </div>
       )}
