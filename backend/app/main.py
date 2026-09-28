@@ -25,13 +25,26 @@ logger = logging.getLogger("studenthub")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Safe automatic schema creation on server startup if needed
+    # Run Alembic migrations automatically on every startup
+    # This means Render deploys will apply pending migrations without any manual terminal commands
     try:
-        logger.info("Initializing database schema...")
-        Base.metadata.create_all(bind=engine)
-        logger.info("Database schema initialized successfully.")
+        logger.info("Running Alembic migrations...")
+        from alembic.config import Config
+        from alembic import command as alembic_command
+        import os
+
+        alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "..", "..", "alembic.ini"))
+        alembic_cfg.set_main_option("sqlalchemy.url", settings.sync_database_url)
+        alembic_command.upgrade(alembic_cfg, "head")
+        logger.info("Alembic migrations applied successfully.")
     except Exception as e:
-        logger.warning(f"Database schema initialization check: {e}")
+        logger.warning(f"Alembic migration error (non-fatal): {e}")
+        # Fallback: create tables directly if alembic fails
+        try:
+            Base.metadata.create_all(bind=engine)
+            logger.info("Fallback: tables created via SQLAlchemy metadata.")
+        except Exception as e2:
+            logger.error(f"Fallback schema creation also failed: {e2}")
     yield
 
 # Initialize FastAPI application
