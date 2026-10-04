@@ -18,25 +18,46 @@ logging.basicConfig(
 logger = logging.getLogger("studenthub")
 
 
+from sqlalchemy import text
+from pathlib import Path
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Auto-run Alembic migrations on every startup (handles new columns automatically)
+    # 1. Base table creation
     try:
-        logger.info("Running Alembic migrations...")
-        from alembic.config import Config
-        from alembic import command as alembic_command
-
-        alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "..", "..", "alembic.ini"))
-        alembic_cfg.set_main_option("sqlalchemy.url", settings.sync_database_url)
-        alembic_command.upgrade(alembic_cfg, "head")
-        logger.info("Migrations applied.")
+        logger.info("Initializing database tables...")
+        Base.metadata.create_all(bind=engine)
+        logger.info("Base tables checked/created.")
     except Exception as e:
-        logger.warning(f"Alembic migration warning: {e}")
-        try:
-            Base.metadata.create_all(bind=engine)
-            logger.info("Fallback: tables created via SQLAlchemy.")
-        except Exception as e2:
-            logger.error(f"Schema creation failed: {e2}")
+        logger.warning(f"Metadata create_all: {e}")
+
+    # 2. Add security columns to users table if not already present (PostgreSQL safe idempotence)
+    try:
+        logger.info("Ensuring users table security columns exist...")
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_token VARCHAR(255);"))
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_token_expires TIMESTAMPTZ;"))
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER DEFAULT 0;"))
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;"))
+        logger.info("Security columns ensured.")
+    except Exception as e:
+        logger.warning(f"Users column migration notice: {e}")
+
+    # 3. Auto-run Alembic migrations if alembic.ini is found
+    try:
+        backend_dir = Path(__file__).resolve().parent.parent
+        ini_path = backend_dir / "alembic.ini"
+        if ini_path.exists():
+            from alembic.config import Config
+            from alembic import command as alembic_command
+
+            alembic_cfg = Config(str(ini_path))
+            alembic_cfg.set_main_option("sqlalchemy.url", settings.sync_database_url)
+            alembic_command.upgrade(alembic_cfg, "head")
+            logger.info("Alembic migrations applied.")
+    except Exception as e:
+        logger.warning(f"Alembic auto-upgrade notice: {e}")
+
     yield
 
 
@@ -69,7 +90,16 @@ app.add_middleware(
 async def validation_error_handler(request: Request, exc: RequestValidationError):
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={"error": "Validation Error", "details": exc.errors()},
+        content={"detail": "Validation Error", "errors": exc.errors()},
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled server error on {request.method} {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": str(exc)},
     )
 
 
