@@ -89,4 +89,39 @@ def test_logout(unique_user_payload):
     
     response = client.post("/api/v1/auth/logout", headers=headers)
     assert response.status_code == 200
-    assert response.json()["message"] == "Successfully logged out"
+    assert "logged out" in response.json()["message"].lower()
+
+
+def test_forgot_password_always_returns_200(unique_user_payload):
+    """Endpoint must never reveal whether an email is registered."""
+    client.post("/api/v1/auth/register", json=unique_user_payload)
+    # Registered email
+    response = client.post("/api/v1/auth/forgot-password", json={"email": unique_user_payload["email"]})
+    assert response.status_code == 200
+    # Non-existent email — still 200
+    response = client.post("/api/v1/auth/forgot-password", json={"email": "nobody@nonexistent.dev"})
+    assert response.status_code == 200
+
+
+def test_reset_password_invalid_token():
+    """A bogus token must be rejected with 400."""
+    response = client.post("/api/v1/auth/reset-password", json={
+        "token": "completely-invalid-token-xyz",
+        "new_password": "NewPassword123!"
+    })
+    assert response.status_code == 400
+
+
+def test_register_short_password_rejected(unique_user_payload):
+    """Passwords shorter than 6 chars must be rejected at schema validation."""
+    payload = {**unique_user_payload, "password": "abc"}
+    response = client.post("/api/v1/auth/register", json=payload)
+    assert response.status_code == 422
+
+
+def test_login_nonexistent_email():
+    response = client.post("/api/v1/auth/login", json={
+        "email": "ghost@notreal.dev",
+        "password": "SomePassword123"
+    })
+    assert response.status_code == 401

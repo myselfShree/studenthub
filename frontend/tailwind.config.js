@@ -43,7 +43,7 @@ module.exports = {
         }
       },
       fontFamily: {
-        display: ['OffBit', 'Cinzel', 'Playfair Display', 'Georgia', 'serif'],
+        display: ['Cinzel', 'Playfair Display', 'Georgia', 'serif'],
         sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
         mono: ['JetBrains Mono', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       },

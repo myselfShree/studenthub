@@ -30,7 +30,7 @@ export default function StudentHubLogo({
         />
       </div>
       {showText && (
-        <span className={`font-display font-bold tracking-tight text-[#FFFBF4] ${textSize}`}>
+        <span className={`font-sans font-bold tracking-tight text-[#FFFBF4] ${textSize}`}>
           Student Hub
         </span>
       )}

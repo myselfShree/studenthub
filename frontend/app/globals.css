@@ -7,16 +7,18 @@
 /*  Palette: Warm Neutral / Architectural Editorial                           */
 /* -------------------------------------------------------------------------- */
 
-@font-face {
-  font-family: 'OffBit';
-  src: local('OffBit'),
-       local('OffBit-Regular'),
-       local('OffBit 101'),
-       url('/fonts/OffBit-Regular.woff2') format('woff2'),
-       url('/fonts/OffBit.woff2') format('woff2');
-  font-weight: 400 700;
-  font-style: normal;
-  font-display: swap;
+/* ── Typography ── */
+/* font-display: reserved for brand wordmarks and large section headings ONLY.
+   Uses Cinzel (serif, loaded from Google Fonts) as primary display font.
+   Do NOT apply to inputs, labels, buttons, or body text. */
+.font-display {
+  font-family: 'Cinzel', 'Playfair Display', Georgia, serif;
+  letter-spacing: 0.02em;
+}
+
+/* Ensure all form elements inherit Inter, never a display font */
+input, textarea, select, button, label {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 :root {
