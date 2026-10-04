@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { Download, FileText, Clock, AlertTriangle, Loader2 } from 'lucide-react';
 import StudentHubLogo from '@/components/StudentHubLogo';
+import { API_BASE_URL } from '@/lib/api';
 
 interface ShareInfo {
   filename: string;
@@ -33,12 +34,11 @@ export default function SharePage() {
   const [loading, setLoading] = useState(true);
   const [gone, setGone] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
   useEffect(() => {
     const fetchInfo = async () => {
       try {
-        const res = await fetch(BASE + '/files/shared/' + token);
+        const res = await fetch(`${API_BASE_URL}/files/shared/${token}`);
         if (res.status === 404 || res.status === 410) { setGone(true); return; }
         if (!res.ok) { setGone(true); return; }
         const data = await res.json();
@@ -47,11 +47,11 @@ export default function SharePage() {
       finally { setLoading(false); }
     };
     fetchInfo();
-  }, [token, BASE]);
+  }, [token]);
 
   const handleDownload = () => {
     setDownloading(true);
-    window.location.href = BASE + '/files/shared/' + token + '/download';
+    window.location.href = `${API_BASE_URL}/files/shared/${token}/download`;
     setTimeout(() => setDownloading(false), 2000);
   };
 

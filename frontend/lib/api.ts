@@ -1,4 +1,7 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+// Normalize API Base URL: defaults to production Render backend, ensures /api/v1 prefix
+const RAW_URL = process.env.NEXT_PUBLIC_API_URL || 'https://studenthub-backend-u02v.onrender.com';
+const CLEAN_URL = RAW_URL.replace(/\/+$/, '');
+export const API_BASE_URL = CLEAN_URL.endsWith('/api/v1') ? CLEAN_URL : `${CLEAN_URL}/api/v1`;
 
 class ApiClient {
   private getAuthToken(): string | null {
