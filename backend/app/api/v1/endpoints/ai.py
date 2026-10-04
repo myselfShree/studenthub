@@ -113,3 +113,8 @@ def get_ai_history(
     return db.query(AIInteraction).filter(
         AIInteraction.user_id == current_user.id
     ).order_by(AIInteraction.created_at.desc()).offset(skip).limit(limit).all()
+
+@router.get("/status")
+def get_ai_status(current_user: User = Depends(get_current_active_user)):
+    """Check whether Gemini AI is connected and active."""
+    return ai_service.get_status()

@@ -116,6 +116,17 @@ class ApiClient {
     return this.request<any>('/auth/me');
   }
 
+  async updateProfile(data: { name?: string; email?: string; password?: string }) {
+    return this.request<any>('/auth/me', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getAIStatus() {
+    return this.request<any>('/ai/status');
+  }
+
   // Dashboard
   async getDashboardSummary() {
     return this.request<any>('/dashboard/summary');

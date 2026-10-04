@@ -387,3 +387,82 @@ body {
 ::-webkit-scrollbar-track { background: #11120D; }
 ::-webkit-scrollbar-thumb { background: #36362F; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #565449; }
+/* ══════════════════════════════════════════════════════════════
+   LIGHT MODE
+══════════════════════════════════════════════════════════════ */
+
+html:not(.dark) {
+  --color-bg-primary:    #F5F2EC;
+  --color-bg-surface:    #EDEAE2;
+  --color-bg-elevated:   #E4E0D6;
+  --color-text-primary:  #1A1A14;
+  --color-text-secondary:#3D3C34;
+  --color-text-muted:    #736E5E;
+  --color-border:        #D4CEBF;
+  --color-border-subtle: #E0DBCF;
+  --color-olive:         #7A7565;
+  --color-sage:          #5A7247;
+  --color-sage-subtle:   #E8EDE0;
+  --glass-bg:            rgba(237, 234, 226, 0.7);
+  --glass-bg-strong:     rgba(228, 224, 214, 0.85);
+  --glass-border:        rgba(26, 26, 20, 0.1);
+  --shadow-glass:        0 8px 32px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.6);
+}
+
+html:not(.dark) body { background-color: #F5F2EC; color: #1A1A14; }
+html:not(.dark) .sh-card { background-color: #EDEAE2; border-color: #D4CEBF; color: #1A1A14; }
+html:not(.dark) .sh-card-elevated { background-color: #E4E0D6; border-color: #D4CEBF; color: #1A1A14; }
+html:not(.dark) .sh-input { background-color: #F5F2EC; border-color: #D4CEBF; color: #1A1A14; }
+html:not(.dark) .sh-input::placeholder { color: #736E5E; }
+html:not(.dark) .sh-select { background-color: #F5F2EC; border-color: #D4CEBF; color: #1A1A14; }
+html:not(.dark) .sh-btn-secondary { background-color: #EDEAE2; color: #1A1A14; border-color: #D4CEBF; }
+html:not(.dark) .sh-btn-secondary:hover { background-color: #E4E0D6; border-color: #7A7565; }
+html:not(.dark) .sh-btn-sage { background-color: #E8EDE0; color: #5A7247; border-color: rgba(90,114,71,0.4); }
+html:not(.dark) .sh-btn-sage:hover { background-color: rgba(90,114,71,0.15); border-color: #5A7247; }
+
+/* ══════════════════════════════════════════════════════════════
+   HORIZONTAL FILTER SCROLLBAR
+══════════════════════════════════════════════════════════════ */
+
+.sh-filter-scroll {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.375rem;
+  padding-top: 0.125rem;
+  white-space: nowrap;
+  scrollbar-width: thin;
+  scrollbar-color: #565449 #181914;
+}
+
+.sh-filter-scroll::-webkit-scrollbar {
+  height: 5px;
+}
+
+.sh-filter-scroll::-webkit-scrollbar-track {
+  background: #181914;
+  border-radius: 9999px;
+}
+
+.sh-filter-scroll::-webkit-scrollbar-thumb {
+  background: #565449;
+  border-radius: 9999px;
+}
+
+.sh-filter-scroll::-webkit-scrollbar-thumb:hover {
+  background: #8E9B7A;
+}
+
+html:not(.dark) .sh-filter-scroll::-webkit-scrollbar-track {
+  background: #E0DBCF;
+}
+
+html:not(.dark) .sh-filter-scroll::-webkit-scrollbar-thumb {
+  background: #B5AFA1;
+}
+
+html:not(.dark) .sh-filter-scroll::-webkit-scrollbar-thumb:hover {
+  background: #5A7247;
+}

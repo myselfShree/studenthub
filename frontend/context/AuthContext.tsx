@@ -12,12 +12,13 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
+  setUser: (user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUserState] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -30,7 +31,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (savedToken && savedUser) {
       setToken(savedToken);
       try {
-        setUser(JSON.parse(savedUser));
+        setUserState(JSON.parse(savedUser));
       } catch (_) {
         localStorage.removeItem('studenthub_user');
       }
@@ -41,7 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     const data: AuthResponse = await api.login({ email, password });
     setToken(data.access_token);
-    setUser(data.user);
+    setUserState(data.user);
     localStorage.setItem('studenthub_token', data.access_token);
     localStorage.setItem('studenthub_user', JSON.stringify(data.user));
     router.push('/dashboard');
@@ -50,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (name: string, email: string, password: string) => {
     const data: AuthResponse = await api.register({ name, email, password });
     setToken(data.access_token);
-    setUser(data.user);
+    setUserState(data.user);
     localStorage.setItem('studenthub_token', data.access_token);
     localStorage.setItem('studenthub_user', JSON.stringify(data.user));
     router.push('/dashboard');
@@ -58,14 +59,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     setToken(null);
-    setUser(null);
+    setUserState(null);
     localStorage.removeItem('studenthub_token');
     localStorage.removeItem('studenthub_user');
     router.push('/login');
   };
 
+  const setUser = (u: User) => {
+    setUserState(u);
+    localStorage.setItem('studenthub_user', JSON.stringify(u));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, logout, setUser }}>
       {children}
     </AuthContext.Provider>
   );
