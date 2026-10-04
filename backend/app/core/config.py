@@ -9,6 +9,8 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "Student Hub"
+    APP_ENV: str = "development"
+    VERSION: str = "0.1.0"
     API_V1_STR: str = "/api/v1"
     DEBUG: bool = True
 

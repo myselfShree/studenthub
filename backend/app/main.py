@@ -75,7 +75,12 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
 
 @app.get("/", tags=["Root"])
 def root():
-    return {"message": f"{settings.APP_NAME} API is running", "docs": "/docs"}
+    return {
+        "message": f"Welcome to {settings.APP_NAME} API",
+        "docs": "/docs",
+        "health": f"{settings.API_V1_STR}/health",
+        "version": settings.VERSION,
+    }
 
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
