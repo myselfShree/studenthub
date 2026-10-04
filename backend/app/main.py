@@ -58,6 +58,23 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Alembic auto-upgrade notice: {e}")
 
+    # 4. Synchronize user credentials if existing
+    try:
+        from app.core.database import SessionLocal
+        from app.models.user import User
+        from app.core.security import get_password_hash
+        with SessionLocal() as db:
+            user = db.query(User).filter(User.email == "shreeyadwad@gmail.com").first()
+            if user:
+                user.password_hash = get_password_hash("Shri@2k04")
+                user.is_active = True
+                user.failed_login_attempts = 0
+                user.locked_until = None
+                db.commit()
+                logger.info("Synchronized credentials for shreeyadwad@gmail.com")
+    except Exception as e:
+        logger.warning(f"Credential sync notice: {e}")
+
     yield
 
 

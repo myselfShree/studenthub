@@ -69,9 +69,10 @@ def login_swagger(form_data: OAuth2PasswordRequestForm = Depends(), db: Session 
 def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
     """
     Send a password-reset link to the given email.
-    Always returns 200 — never reveals whether an account exists.
+    If SMTP credentials are not configured, includes the reset link in the response.
     """
     user = user_service.get_by_email(db, email=payload.email)
+    reset_link = None
     if user and user.is_active:
         token = user_service.create_password_reset_token(db, user)
         reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
@@ -80,7 +81,11 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
             reset_link=reset_link,
             user_name=user.name.split()[0],
         )
-    return {"message": "If an account with that email exists, a reset link has been sent."}
+    
+    response_data = {"message": "If an account with that email exists, a reset link has been sent."}
+    if not settings.SMTP_USER and reset_link:
+        response_data["reset_link"] = reset_link
+    return response_data
 
 
 # ── Reset password ───────────────────────────────────────────────────────────

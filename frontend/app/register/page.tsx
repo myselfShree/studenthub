@@ -27,7 +27,12 @@ export default function RegisterPage() {
     try {
       await register(name, email, password);
     } catch (err: any) {
-      setError(err.message || 'Registration failed. Try a different email.');
+      const msg = err.message || '';
+      if (msg.toLowerCase().includes('already exists')) {
+        setError('This email is already registered. Please sign in below.');
+      } else {
+        setError(msg || 'Registration failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
