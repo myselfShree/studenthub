@@ -162,3 +162,8 @@ export interface AIExplainResponse {
   explanation: string;
   interaction_id?: number | null;
 }
+
+export interface AIChatResponse {
+  reply: string;
+  interaction_id?: number | null;
+}

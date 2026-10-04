@@ -34,9 +34,36 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Navbar />
       <div className="flex-1 flex overflow-hidden">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto">{children}</div>
-        </main>
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+            <div className="max-w-7xl mx-auto">{children}</div>
+          </main>
+
+          {/* Attribution Footer */}
+          <footer className="shrink-0 border-t border-[#1E1E18] px-6 py-3">
+            <p className="text-[11px] text-[#57564F] text-center leading-relaxed">
+              A college project by{' '}
+              <a
+                href="https://www.linkedin.com/in/shrikant-nagesh-yadwad-5b3075252/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#6B6A62] hover:text-[#8D8777] transition-colors underline-offset-2 hover:underline"
+              >
+                Shrikant Yadwad
+              </a>{' '}
+              &amp;{' '}
+              <a
+                href="https://www.linkedin.com/in/piyush-adhav-b5323a360/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#6B6A62] hover:text-[#8D8777] transition-colors underline-offset-2 hover:underline"
+              >
+                Piyush Adhav
+              </a>{' '}
+              &middot; Indira University
+            </p>
+          </footer>
+        </div>
       </div>
     </div>
   );

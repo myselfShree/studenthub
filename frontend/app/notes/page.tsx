@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { api } from '@/lib/api';
 import { Note, Subject, AISummaryResponse, AIKeyPointsResponse, AIQuizResponse, AIExplainResponse } from '@/types';
@@ -17,10 +17,17 @@ import {
   Loader2,
   Save,
   BrainCircuit,
-  AlertCircle
+  AlertCircle,
+  Send,
+  MessageSquare,
 } from 'lucide-react';
 import { SkeletonTextBlock } from '@/components/Skeleton';
 import EmptyState from '@/components/EmptyState';
+
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
 
 export default function NotesPage() {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -41,7 +48,7 @@ export default function NotesPage() {
 
   // AI Drawer State
   const [showAIDrawer, setShowAIDrawer] = useState(false);
-  const [aiTab, setAiTab] = useState<'summarize' | 'keypoints' | 'quiz' | 'explain'>('summarize');
+  const [aiTab, setAiTab] = useState<'summarize' | 'keypoints' | 'quiz' | 'explain' | 'chat'>('summarize');
   const [aiLoading, setAiLoading] = useState(false);
   const [summaryData, setSummaryData] = useState<AISummaryResponse | null>(null);
   const [keyPointsData, setKeyPointsData] = useState<AIKeyPointsResponse | null>(null);
@@ -51,6 +58,12 @@ export default function NotesPage() {
   const [explainData, setExplainData] = useState<AIExplainResponse | null>(null);
   const [copied, setCopied] = useState(false);
   const [savedStatus, setSavedStatus] = useState(false);
+
+  // Chat state
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Load Data
   const loadData = async () => {
@@ -77,6 +90,10 @@ export default function NotesPage() {
   useEffect(() => {
     loadData();
   }, [selectedSubjectId, searchQuery]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
 
   const selectNote = (note: Note) => {
     setActiveNote(note);
@@ -216,11 +233,44 @@ export default function NotesPage() {
     }
   };
 
+  const handleSendChat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const msg = chatInput.trim();
+    if (!msg) return;
+
+    const userMsg: ChatMessage = { role: 'user', content: msg };
+    const newHistory = [...chatMessages, userMsg];
+    setChatMessages(newHistory);
+    setChatInput('');
+    setChatLoading(true);
+
+    try {
+      const res = await api.aiChat({
+        message: msg,
+        context: content ? content.slice(0, 800) : undefined,
+        history: chatMessages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
+      });
+      setChatMessages([...newHistory, { role: 'assistant', content: res.reply }]);
+    } catch (err: any) {
+      setChatMessages([...newHistory, { role: 'assistant', content: 'Sorry, I could not reach the AI server. Please try again.' }]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const AI_TABS = [
+    { id: 'summarize', label: 'Summary' },
+    { id: 'keypoints', label: 'Bullets' },
+    { id: 'quiz', label: 'Quiz' },
+    { id: 'explain', label: 'Explain' },
+    { id: 'chat', label: 'Chat' },
+  ] as const;
 
   return (
     <AppLayout>
@@ -330,7 +380,7 @@ export default function NotesPage() {
           </div>
         </div>
 
-        {/* Center Canvas: Note Editor (Flat high-contrast area for writing) */}
+        {/* Center Canvas: Note Editor */}
         <div className="flex-1 flex flex-col sh-card rounded-xl p-5 border border-[#36362F] space-y-3">
           {activeNote ? (
             <>
@@ -410,211 +460,299 @@ export default function NotesPage() {
           )}
         </div>
 
-        {/* Right Drawer: AI Study Studio (.sh-glass-strong elevated panel) */}
+        {/* Right Drawer: AI Study Studio */}
         {showAIDrawer && (
-          <div className="w-full lg:w-96 shrink-0 sh-glass-strong rounded-xl p-5 border border-[#8E9B7A]/40 flex flex-col justify-between shadow-2xl">
-            <div className="space-y-4 overflow-y-auto pr-1 flex-1">
-              {/* Drawer Header */}
-              <div className="flex items-center justify-between pb-2.5 border-b border-[#36362F]">
-                <div className="flex items-center gap-2 text-[#8E9B7A]">
-                  <BrainCircuit className="w-4 h-4" strokeWidth={1.75} />
-                  <span className="text-xs font-bold font-display">Gemini AI Study Assistant</span>
-                </div>
-                <button
-                  onClick={() => setShowAIDrawer(false)}
-                  className="p-1 rounded text-[#8D8777] hover:text-[#FFFBF4]"
-                >
-                  <X className="w-4 h-4" strokeWidth={1.75} />
-                </button>
+          <div className="w-full lg:w-96 shrink-0 sh-glass-strong rounded-xl p-5 border border-[#8E9B7A]/40 flex flex-col shadow-2xl">
+            {/* Drawer Header */}
+            <div className="flex items-center justify-between pb-2.5 border-b border-[#36362F] mb-4">
+              <div className="flex items-center gap-2 text-[#8E9B7A]">
+                <BrainCircuit className="w-4 h-4" strokeWidth={1.75} />
+                <span className="text-xs font-bold font-display">AI Study Assistant</span>
               </div>
-
-              {/* AI Tabs */}
-              <div className="grid grid-cols-4 gap-1 p-1 rounded-lg bg-[#11120D] border border-[#36362F] text-[11px] font-medium">
-                {(['summarize', 'keypoints', 'quiz', 'explain'] as const).map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => { 
-                      setAiTab(tab); 
-                      if (tab === 'summarize') handleAISummarize();
-                      if (tab === 'keypoints') handleAIKeyPoints();
-                      if (tab === 'quiz') handleAIGenerateQuiz();
-                    }}
-                    className={`py-1 rounded capitalize transition-colors ${
-                      aiTab === tab ? 'bg-[#282F24] text-[#8E9B7A] font-semibold border border-[#8E9B7A]/30' : 'text-[#8D8777] hover:text-[#D8CFBC]'
-                    }`}
-                  >
-                    {tab === 'keypoints' ? 'Bullets' : tab}
-                  </button>
-                ))}
-              </div>
-
-              {/* AI Content Area */}
-              {aiLoading ? (
-                <div className="py-16 flex flex-col items-center justify-center gap-3">
-                  <div className="w-7 h-7 rounded-full border-2 border-[#8E9B7A] border-t-transparent animate-spin" />
-                  <span className="text-xs text-[#8D8777]">Gemini analyzing note concepts...</span>
-                </div>
-              ) : (
-                <>
-                  {/* Tab 1: Summarize */}
-                  {aiTab === 'summarize' && (
-                    <div className="space-y-3">
-                      {summaryData ? (
-                        <div className="space-y-3">
-                          <div className="p-3 rounded-lg bg-[#11120D] border border-[#36362F] space-y-1.5">
-                            <span className="text-[10px] font-bold text-[#8E9B7A] uppercase tracking-wider block font-mono">
-                              Key Takeaway
-                            </span>
-                            <p className="text-xs text-[#FFFBF4] font-medium italic leading-relaxed">
-                              "{summaryData.key_takeaway}"
-                            </p>
-                          </div>
-
-                          <div className="p-3 rounded-lg bg-[#11120D] border border-[#36362F] space-y-1.5">
-                            <span className="text-[10px] font-bold text-[#8D8777] uppercase tracking-wider block font-mono">
-                              Study Summary
-                            </span>
-                            <p className="text-xs text-[#D8CFBC] leading-relaxed whitespace-pre-line">
-                              {summaryData.summary}
-                            </p>
-                          </div>
-
-                          <button
-                            onClick={() => copyToClipboard(`${summaryData.key_takeaway}\n\n${summaryData.summary}`)}
-                            className="w-full sh-btn-secondary py-2 gap-1.5"
-                          >
-                            {copied ? <Check className="w-3.5 h-3.5 text-[#8E9B7A]" strokeWidth={2} /> : <Copy className="w-3.5 h-3.5" strokeWidth={1.75} />}
-                            <span>{copied ? 'Copied to Clipboard' : 'Copy Summary'}</span>
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={handleAISummarize}
-                          className="w-full sh-btn-sage py-2"
-                        >
-                          Generate Note Summary
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Tab 2: Key Points */}
-                  {aiTab === 'keypoints' && (
-                    <div className="space-y-3">
-                      {keyPointsData ? (
-                        <div className="space-y-2">
-                          {keyPointsData.key_points.map((point, idx) => (
-                            <div
-                              key={idx}
-                              className="p-2.5 rounded-lg bg-[#11120D] border border-[#36362F] flex items-start gap-2 text-xs text-[#D8CFBC]"
-                            >
-                              <span className="w-4 h-4 rounded bg-[#282F24] text-[#8E9B7A] flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
-                                {idx + 1}
-                              </span>
-                              <span className="leading-relaxed">{point}</span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <button
-                          onClick={handleAIKeyPoints}
-                          className="w-full sh-btn-sage py-2"
-                        >
-                          Extract Key Concepts
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Tab 3: Interactive Practice Quiz */}
-                  {aiTab === 'quiz' && (
-                    <div className="space-y-3">
-                      {quizData ? (
-                        <div className="space-y-3">
-                          {quizData.questions.map((q, qIdx) => {
-                            const selectedOption = selectedQuizAnswers[qIdx];
-                            const isAnswered = selectedOption !== undefined;
-
-                            return (
-                              <div key={qIdx} className="p-3 rounded-lg bg-[#11120D] border border-[#36362F] space-y-2">
-                                <span className="text-xs font-semibold text-[#FFFBF4] block">
-                                  Q{qIdx + 1}: {q.question}
-                                </span>
-                                <div className="space-y-1.5">
-                                  {q.options.map((opt, oIdx) => {
-                                    const isSelected = selectedOption === opt;
-                                    const isCorrect = opt === q.correct_answer;
-
-                                    let btnStyle = 'bg-[#1C1C17] border-[#36362F] text-[#D8CFBC] hover:bg-[#24241E]';
-                                    if (isAnswered) {
-                                      if (isCorrect) btnStyle = 'bg-[#282F24] border-[#8E9B7A] text-[#8E9B7A] font-semibold';
-                                      else if (isSelected) btnStyle = 'bg-[#C76A5E]/15 border-[#C76A5E]/40 text-[#C76A5E]';
-                                    }
-
-                                    return (
-                                      <button
-                                        key={oIdx}
-                                        disabled={isAnswered}
-                                        onClick={() => setSelectedQuizAnswers({ ...selectedQuizAnswers, [qIdx]: opt })}
-                                        className={`w-full text-left p-2 rounded-lg text-xs border transition-colors ${btnStyle}`}
-                                      >
-                                        {opt}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                                {isAnswered && (
-                                  <p className="text-[11px] text-[#8D8777] pt-1.5 leading-relaxed border-t border-[#36362F]">
-                                    💡 {q.explanation}
-                                  </p>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <button
-                          onClick={handleAIGenerateQuiz}
-                          className="w-full sh-btn-sage py-2"
-                        >
-                          Generate Practice Quiz
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Tab 4: Topic Explainer */}
-                  {aiTab === 'explain' && (
-                    <div className="space-y-3">
-                      <form onSubmit={handleAIExplain} className="space-y-2">
-                        <input
-                          type="text"
-                          value={explainTopic}
-                          onChange={(e) => setExplainTopic(e.target.value)}
-                          placeholder="e.g. Dynamic Programming, Dijkstra, Fourier..."
-                          className="sh-input"
-                        />
-                        <button
-                          type="submit"
-                          className="w-full sh-btn-sage py-2"
-                        >
-                          Explain Concept
-                        </button>
-                      </form>
-
-                      {explainData && (
-                        <div className="p-3 rounded-lg bg-[#11120D] border border-[#36362F] space-y-1.5">
-                          <span className="text-xs font-bold text-[#8E9B7A]">{explainData.topic}</span>
-                          <p className="text-xs text-[#D8CFBC] leading-relaxed whitespace-pre-line">
-                            {explainData.explanation}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
+              <button
+                onClick={() => setShowAIDrawer(false)}
+                className="p-1 rounded text-[#8D8777] hover:text-[#FFFBF4]"
+              >
+                <X className="w-4 h-4" strokeWidth={1.75} />
+              </button>
             </div>
+
+            {/* AI Tabs — 5 tabs now */}
+            <div className="grid grid-cols-5 gap-1 p-1 rounded-lg bg-[#11120D] border border-[#36362F] text-[10px] font-medium mb-4 shrink-0">
+              {AI_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setAiTab(tab.id);
+                    if (tab.id === 'summarize') handleAISummarize();
+                    if (tab.id === 'keypoints') handleAIKeyPoints();
+                    if (tab.id === 'quiz') handleAIGenerateQuiz();
+                  }}
+                  className={`py-1.5 rounded capitalize transition-colors ${
+                    aiTab === tab.id
+                      ? 'bg-[#282F24] text-[#8E9B7A] font-semibold border border-[#8E9B7A]/30'
+                      : 'text-[#8D8777] hover:text-[#D8CFBC]'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* AI Content Area */}
+            {aiTab === 'chat' ? (
+              /* ── Chat Tab ── */
+              <div className="flex flex-col flex-1 min-h-0">
+                {/* Message history */}
+                <div className="flex-1 overflow-y-auto space-y-3 pr-1 mb-3">
+                  {chatMessages.length === 0 && (
+                    <div className="py-10 text-center space-y-2">
+                      <MessageSquare className="w-7 h-7 text-[#565449] mx-auto" strokeWidth={1.5} />
+                      <p className="text-xs text-[#8D8777] leading-relaxed">
+                        Ask me anything about your notes or any academic topic.
+                      </p>
+                      {content && (
+                        <p className="text-[11px] text-[#565449]">
+                          I can see your current note as context.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {chatMessages.map((msg, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed ${
+                          msg.role === 'user'
+                            ? 'bg-[#282F24] text-[#FFFBF4] border border-[#8E9B7A]/30'
+                            : 'bg-[#11120D] text-[#D8CFBC] border border-[#36362F]'
+                        }`}
+                      >
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))}
+
+                  {chatLoading && (
+                    <div className="flex justify-start">
+                      <div className="bg-[#11120D] border border-[#36362F] rounded-xl px-3 py-2 flex items-center gap-2">
+                        <div className="w-3.5 h-3.5 rounded-full border-2 border-[#8E9B7A] border-t-transparent animate-spin" />
+                        <span className="text-[11px] text-[#8D8777]">Thinking...</span>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+
+                {/* Clear chat */}
+                {chatMessages.length > 0 && (
+                  <button
+                    onClick={() => setChatMessages([])}
+                    className="text-[10px] text-[#565449] hover:text-[#8D8777] mb-2 text-right w-full transition-colors"
+                  >
+                    Clear conversation
+                  </button>
+                )}
+
+                {/* Input */}
+                <form onSubmit={handleSendChat} className="flex items-center gap-2 shrink-0">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder="Ask anything..."
+                    disabled={chatLoading}
+                    className="sh-input flex-1 text-xs py-2"
+                  />
+                  <button
+                    type="submit"
+                    disabled={chatLoading || !chatInput.trim()}
+                    className="sh-btn-sage p-2 shrink-0 disabled:opacity-40"
+                  >
+                    <Send className="w-4 h-4" strokeWidth={1.75} />
+                  </button>
+                </form>
+              </div>
+            ) : (
+              /* ── Other tabs (Summarize / Bullets / Quiz / Explain) ── */
+              <div className="flex-1 overflow-y-auto pr-1 space-y-4">
+                {aiLoading ? (
+                  <div className="py-16 flex flex-col items-center justify-center gap-3">
+                    <div className="w-7 h-7 rounded-full border-2 border-[#8E9B7A] border-t-transparent animate-spin" />
+                    <span className="text-xs text-[#8D8777]">Analyzing note content...</span>
+                  </div>
+                ) : (
+                  <>
+                    {/* Tab 1: Summarize */}
+                    {aiTab === 'summarize' && (
+                      <div className="space-y-3">
+                        {summaryData ? (
+                          <div className="space-y-3">
+                            <div className="p-3 rounded-lg bg-[#11120D] border border-[#36362F] space-y-1.5">
+                              <span className="text-[10px] font-bold text-[#8E9B7A] uppercase tracking-wider block font-mono">
+                                Key Takeaway
+                              </span>
+                              <p className="text-xs text-[#FFFBF4] font-medium italic leading-relaxed">
+                                &ldquo;{summaryData.key_takeaway}&rdquo;
+                              </p>
+                            </div>
+
+                            <div className="p-3 rounded-lg bg-[#11120D] border border-[#36362F] space-y-1.5">
+                              <span className="text-[10px] font-bold text-[#8D8777] uppercase tracking-wider block font-mono">
+                                Study Summary
+                              </span>
+                              <p className="text-xs text-[#D8CFBC] leading-relaxed whitespace-pre-line">
+                                {summaryData.summary}
+                              </p>
+                            </div>
+
+                            <button
+                              onClick={() => copyToClipboard(`${summaryData.key_takeaway}\n\n${summaryData.summary}`)}
+                              className="w-full sh-btn-secondary py-2 gap-1.5"
+                            >
+                              {copied ? <Check className="w-3.5 h-3.5 text-[#8E9B7A]" strokeWidth={2} /> : <Copy className="w-3.5 h-3.5" strokeWidth={1.75} />}
+                              <span>{copied ? 'Copied to Clipboard' : 'Copy Summary'}</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={handleAISummarize}
+                            className="w-full sh-btn-sage py-2"
+                          >
+                            Generate Note Summary
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Tab 2: Key Points */}
+                    {aiTab === 'keypoints' && (
+                      <div className="space-y-3">
+                        {keyPointsData ? (
+                          <div className="space-y-2">
+                            {keyPointsData.key_points.map((point, idx) => (
+                              <div
+                                key={idx}
+                                className="p-2.5 rounded-lg bg-[#11120D] border border-[#36362F] flex items-start gap-2 text-xs text-[#D8CFBC]"
+                              >
+                                <span className="w-4 h-4 rounded bg-[#282F24] text-[#8E9B7A] flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
+                                  {idx + 1}
+                                </span>
+                                <span className="leading-relaxed">{point}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <button
+                            onClick={handleAIKeyPoints}
+                            className="w-full sh-btn-sage py-2"
+                          >
+                            Extract Key Concepts
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Tab 3: Interactive Practice Quiz */}
+                    {aiTab === 'quiz' && (
+                      <div className="space-y-3">
+                        {quizData ? (
+                          <div className="space-y-3">
+                            {quizData.questions.map((q, qIdx) => {
+                              const selectedOption = selectedQuizAnswers[qIdx];
+                              const isAnswered = selectedOption !== undefined;
+
+                              return (
+                                <div key={qIdx} className="p-3 rounded-lg bg-[#11120D] border border-[#36362F] space-y-2">
+                                  <span className="text-xs font-semibold text-[#FFFBF4] block">
+                                    Q{qIdx + 1}: {q.question}
+                                  </span>
+                                  <div className="space-y-1.5">
+                                    {q.options.map((opt, oIdx) => {
+                                      const isSelected = selectedOption === opt;
+                                      const isCorrect = opt === q.correct_answer;
+
+                                      let btnStyle = 'bg-[#1C1C17] border-[#36362F] text-[#D8CFBC] hover:bg-[#24241E]';
+                                      if (isAnswered) {
+                                        if (isCorrect) btnStyle = 'bg-[#282F24] border-[#8E9B7A] text-[#8E9B7A] font-semibold';
+                                        else if (isSelected) btnStyle = 'bg-[#C76A5E]/15 border-[#C76A5E]/40 text-[#C76A5E]';
+                                      }
+
+                                      return (
+                                        <button
+                                          key={oIdx}
+                                          disabled={isAnswered}
+                                          onClick={() => setSelectedQuizAnswers({ ...selectedQuizAnswers, [qIdx]: opt })}
+                                          className={`w-full text-left p-2 rounded-lg text-xs border transition-colors ${btnStyle}`}
+                                        >
+                                          {opt}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                  {isAnswered && (
+                                    <p className="text-[11px] text-[#8D8777] pt-1.5 leading-relaxed border-t border-[#36362F]">
+                                      {q.explanation}
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })}
+
+                            <button
+                              onClick={handleAIGenerateQuiz}
+                              className="w-full sh-btn-secondary py-2 text-xs"
+                            >
+                              Regenerate Quiz
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={handleAIGenerateQuiz}
+                            className="w-full sh-btn-sage py-2"
+                          >
+                            Generate Practice Quiz
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Tab 4: Topic Explainer */}
+                    {aiTab === 'explain' && (
+                      <div className="space-y-3">
+                        <form onSubmit={handleAIExplain} className="space-y-2">
+                          <input
+                            type="text"
+                            value={explainTopic}
+                            onChange={(e) => setExplainTopic(e.target.value)}
+                            placeholder="e.g. Dynamic Programming, Dijkstra, Fourier..."
+                            className="sh-input"
+                          />
+                          <button
+                            type="submit"
+                            className="w-full sh-btn-sage py-2"
+                          >
+                            Explain Concept
+                          </button>
+                        </form>
+
+                        {explainData && (
+                          <div className="p-3 rounded-lg bg-[#11120D] border border-[#36362F] space-y-1.5">
+                            <span className="text-xs font-bold text-[#8E9B7A]">{explainData.topic}</span>
+                            <p className="text-xs text-[#D8CFBC] leading-relaxed whitespace-pre-line">
+                              {explainData.explanation}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

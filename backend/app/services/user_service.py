@@ -10,6 +10,8 @@ from app.core.security import get_password_hash, verify_password
 from app.core.config import settings
 
 
+from sqlalchemy import func
+
 class UserService:
 
     @staticmethod
@@ -18,7 +20,8 @@ class UserService:
 
     @staticmethod
     def get_by_email(db: Session, email: str) -> Optional[User]:
-        return db.query(User).filter(User.email == email.lower().strip()).first()
+        clean_email = email.lower().strip()
+        return db.query(User).filter(func.lower(User.email) == clean_email).first()
 
     @staticmethod
     def get_by_reset_token(db: Session, token: str) -> Optional[User]:

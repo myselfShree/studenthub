@@ -20,6 +20,11 @@ class AIExplainRequest(BaseModel):
     topic: str = Field(..., min_length=2, max_length=200, examples=["Backpropagation in Neural Networks"])
     context: Optional[str] = Field(None, description="Optional background context or note snippet")
 
+class AIChatRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=2000, description="User's question or message")
+    context: Optional[str] = Field(None, description="Optional note content as context")
+    history: Optional[List[Dict[str, str]]] = Field(None, description="Previous chat messages [{role, content}]")
+
 # Responses
 class AISummaryResponse(BaseModel):
     summary: str
@@ -43,6 +48,10 @@ class AIQuizResponse(BaseModel):
 class AIExplainResponse(BaseModel):
     topic: str
     explanation: str
+    interaction_id: Optional[int] = None
+
+class AIChatResponse(BaseModel):
+    reply: str
     interaction_id: Optional[int] = None
 
 # Database Interaction History Record

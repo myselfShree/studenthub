@@ -281,6 +281,13 @@ class ApiClient {
     });
   }
 
+  async aiChat(data: { message: string; context?: string; history?: { role: string; content: string }[] }) {
+    return this.request<any>('/ai/chat', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   // Resources
   async getResources(params?: { subject_id?: number; resource_type?: string; search?: string }) {
     const query = new URLSearchParams();

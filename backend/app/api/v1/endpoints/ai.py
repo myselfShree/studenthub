@@ -17,6 +17,8 @@ from app.schemas.ai import (
     AIQuizResponse,
     AIExplainRequest,
     AIExplainResponse,
+    AIChatRequest,
+    AIChatResponse,
     AIInteractionResponse
 )
 
@@ -41,9 +43,7 @@ def summarize_study_material(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """
-    Summarize student study notes into concise paragraphs and a key takeaway.
-    """
+    """Summarize student study notes into concise paragraphs and a key takeaway."""
     content, note_id = resolve_study_content(db, current_user.id, request.note_id, request.content)
     return ai_service.summarize(db, user_id=current_user.id, text_content=content, note_id=note_id)
 
@@ -53,9 +53,7 @@ def extract_key_points(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """
-    Extract key concepts and bullet points from note content.
-    """
+    """Extract key concepts and bullet points from note content."""
     content, note_id = resolve_study_content(db, current_user.id, request.note_id, request.content)
     return ai_service.extract_key_points(db, user_id=current_user.id, text_content=content, note_id=note_id)
 
@@ -65,9 +63,7 @@ def generate_practice_quiz(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """
-    Generate multiple-choice practice questions (MCQs) with explanations.
-    """
+    """Generate multiple-choice practice questions (MCQs) strictly based on the note content."""
     content, note_id = resolve_study_content(db, current_user.id, request.note_id, request.content)
     return ai_service.generate_quiz(
         db,
@@ -83,14 +79,27 @@ def explain_topic(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """
-    Explain a complex concept or topic with clear analogies and examples.
-    """
+    """Explain a complex concept or topic with clear analogies and examples."""
     return ai_service.explain_concept(
         db,
         user_id=current_user.id,
         topic=request.topic,
         context=request.context
+    )
+
+@router.post("/chat", response_model=AIChatResponse)
+def chat_with_assistant(
+    request: AIChatRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Personal AI study assistant — ask any academic question."""
+    return ai_service.chat(
+        db,
+        user_id=current_user.id,
+        message=request.message,
+        context=request.context,
+        history=request.history,
     )
 
 @router.get("/history", response_model=List[AIInteractionResponse])
@@ -100,9 +109,7 @@ def get_ai_history(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """
-    List past AI study assistant interactions for the current student.
-    """
+    """List past AI study assistant interactions for the current student."""
     return db.query(AIInteraction).filter(
         AIInteraction.user_id == current_user.id
     ).order_by(AIInteraction.created_at.desc()).offset(skip).limit(limit).all()
