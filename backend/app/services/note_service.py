@@ -75,6 +75,69 @@ class NoteService:
         return db_note
 
     @staticmethod
+    def create_from_upload(
+        db: Session,
+        user_id: int,
+        filename: str,
+        file_bytes: bytes,
+        subject_id: Optional[int] = None
+    ) -> Note:
+        """Create a new note by extracting text content from an uploaded PDF, TXT, or MD document."""
+        import io
+        import re
+        from pathlib import Path
+
+        stem = Path(filename).stem
+        cleaned_title = re.sub(r'[-_]+', ' ', stem).strip()
+        cleaned_title = " ".join([w.capitalize() for w in cleaned_title.split()])
+        if not cleaned_title:
+            cleaned_title = "Uploaded Study Note"
+
+        ext = Path(filename).suffix.lower()
+        content = ""
+
+        if ext == ".pdf":
+            text_parts = []
+            try:
+                import pypdf
+                reader = pypdf.PdfReader(io.BytesIO(file_bytes))
+                for page_num, page in enumerate(reader.pages):
+                    page_text = page.extract_text()
+                    if page_text and page_text.strip():
+                        text_parts.append(page_text.strip())
+            except Exception:
+                pass
+            
+            if text_parts:
+                content = "\n\n".join(text_parts)
+            else:
+                content = f"Uploaded PDF: {filename}\n(Note: Text could not be extracted directly — the PDF may contain scanned images)."
+        elif ext in [".txt", ".md", ".py", ".java", ".cpp", ".c", ".js", ".ts", ".html", ".css", ".json", ".csv"]:
+            try:
+                content = file_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                content = file_bytes.decode("latin-1", errors="ignore")
+        else:
+            try:
+                content = file_bytes.decode("utf-8", errors="ignore")
+            except Exception:
+                content = f"Uploaded file: {filename}"
+
+        if not content.strip():
+            content = f"Uploaded document: {filename}"
+
+        db_note = Note(
+            user_id=user_id,
+            subject_id=subject_id,
+            title=cleaned_title[:255],
+            content=content
+        )
+        db.add(db_note)
+        db.commit()
+        db.refresh(db_note)
+        return db_note
+
+    @staticmethod
     def delete(db: Session, db_note: Note) -> None:
         """Delete note."""
         db.delete(db_note)

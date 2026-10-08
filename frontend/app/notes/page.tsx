@@ -20,7 +20,10 @@ import {
   AlertCircle,
   Send,
   MessageSquare,
-  RotateCcw
+  RotateCcw,
+  Upload,
+  FileUp,
+  Paperclip
 } from 'lucide-react';
 import EmptyState from '@/components/EmptyState';
 
@@ -40,6 +43,12 @@ export default function NotesPage() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [subjectId, setSubjectId] = useState<number | null>(null);
+
+  // File Upload State
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [uploadError, setUploadError] = useState<string>('');
+  const [isDragging, setIsDragging] = useState(false);
 
   // New Subject Modal
   const [showSubjectModal, setShowSubjectModal] = useState(false);
@@ -125,6 +134,52 @@ export default function NotesPage() {
     setTitle('Untitled Study Note');
     setContent('');
     setSubjectId(selectedSubjectId);
+  };
+
+  const processUploadedFile = async (file: File) => {
+    setUploadingDoc(true);
+    setUploadError('');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      if (selectedSubjectId) {
+        formData.append('subject_id', selectedSubjectId.toString());
+      }
+      const createdNote = await api.uploadNoteDocument(formData);
+      await loadData();
+      selectNote(createdNote);
+    } catch (err: any) {
+      console.error(err);
+      setUploadError(err.message || 'Failed to extract content from uploaded file.');
+    } finally {
+      setUploadingDoc(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await processUploadedFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      await processUploadedFile(file);
+    }
   };
 
   const handleSaveNote = async () => {
@@ -294,22 +349,46 @@ export default function NotesPage() {
 
   return (
     <AppLayout>
+      {/* Hidden File Input for PDF/Doc Upload */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept=".pdf,.txt,.md,.doc,.docx,.csv,.json"
+        onChange={handleFileUpload}
+        className="hidden"
+      />
+
       <div className="flex flex-col lg:flex-row h-[calc(100vh-7.5rem)] gap-4 relative">
         {/* Left Col: Subjects + Notes List */}
         <div className="w-full lg:w-72 shrink-0 flex flex-col sh-card rounded-xl p-3.5 space-y-3 border border-[var(--color-border,#36362F)]">
           {/* Top Actions */}
-          <div className="flex items-center justify-between pb-1">
+          <div className="flex items-center justify-between pb-1 gap-1.5">
             <h2 className="text-xs font-bold text-[var(--color-text-primary,#FFFBF4)] flex items-center gap-1.5 uppercase tracking-wider font-display">
               <FileText className="w-4 h-4 text-[#8E9B7A]" strokeWidth={1.75} />
               Smart Notes
             </h2>
-            <button
-              onClick={handleCreateNewNote}
-              className="sh-btn-primary px-2.5 py-1 text-xs gap-1"
-            >
-              <Plus className="w-3.5 h-3.5" strokeWidth={2} />
-              New
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingDoc}
+                className="sh-btn-secondary px-2 py-1 text-xs gap-1"
+                title="Upload PDF or study document"
+              >
+                {uploadingDoc ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-[#8E9B7A]" />
+                ) : (
+                  <Upload className="w-3.5 h-3.5 text-[#8E9B7A]" strokeWidth={2} />
+                )}
+                <span>PDF</span>
+              </button>
+              <button
+                onClick={handleCreateNewNote}
+                className="sh-btn-primary px-2 py-1 text-xs gap-1"
+              >
+                <Plus className="w-3.5 h-3.5" strokeWidth={2} />
+                New
+              </button>
+            </div>
           </div>
 
           {/* Search */}
@@ -440,8 +519,47 @@ export default function NotesPage() {
           </div>
         </div>
 
-        {/* Center Canvas: Note Editor */}
-        <div className="flex-1 flex flex-col sh-card rounded-xl p-5 border border-[var(--color-border,#36362F)] space-y-3">
+        {/* Center Canvas: Note Editor (with Drag-and-Drop) */}
+        <div 
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`flex-1 flex flex-col sh-card rounded-xl p-5 border transition-all space-y-3 relative ${
+            isDragging 
+              ? 'border-[#8E9B7A] ring-2 ring-[#8E9B7A]/30 bg-[#161B13]' 
+              : 'border-[var(--color-border,#36362F)]'
+          }`}
+        >
+          {/* Drag Overlay */}
+          {isDragging && (
+            <div className="absolute inset-0 bg-[#11120D]/90 backdrop-blur-sm z-30 rounded-xl flex flex-col items-center justify-center p-6 text-center pointer-events-none">
+              <FileUp className="w-12 h-12 text-[#8E9B7A] animate-bounce mb-3" />
+              <p className="text-sm font-bold text-[#FFFBF4]">Drop your PDF or Study Document here</p>
+              <p className="text-xs text-[#8D8777] mt-1">We will automatically extract the text into a new study note.</p>
+            </div>
+          )}
+
+          {/* Uploading Banner */}
+          {uploadingDoc && (
+            <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-lg bg-[#282F24] border border-[#8E9B7A]/40 text-[#D8CFBC] text-xs">
+              <Loader2 className="w-4 h-4 animate-spin text-[#8E9B7A]" />
+              <span className="font-medium">Extracting and parsing document... Please wait a moment.</span>
+            </div>
+          )}
+
+          {/* Upload Error Alert */}
+          {uploadError && (
+            <div className="flex items-center justify-between px-3.5 py-2 rounded-lg bg-[#C76A5E]/15 border border-[#C76A5E]/30 text-[#EBB3AC] text-xs">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-[#C76A5E]" />
+                <span>{uploadError}</span>
+              </div>
+              <button onClick={() => setUploadError('')} className="p-0.5 hover:text-white">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           {activeNote ? (
             <>
               {/* Editor Header Bar */}
@@ -462,6 +580,16 @@ export default function NotesPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingDoc}
+                    className="sh-btn-secondary px-3 py-1.5 text-xs gap-1.5"
+                    title="Import text from another PDF or Document"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-[#8E9B7A]" strokeWidth={1.75} />
+                    <span className="hidden sm:inline">Import PDF</span>
+                  </button>
+
                   <button
                     onClick={() => setShowAIDrawer(!showAIDrawer)}
                     className="sh-btn-sage px-3 py-1.5 text-xs gap-1.5"
@@ -502,21 +630,40 @@ export default function NotesPage() {
                 <textarea
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  placeholder="Type academic notes, definitions, formulas, or lecture summaries..."
+                  placeholder="Type academic notes, definitions, formulas, or lecture summaries... (or drop a PDF file here to import)"
                   className="w-full flex-1 bg-transparent text-xs sm:text-sm text-[var(--color-text-secondary,#D8CFBC)] placeholder-[#8D8777] resize-none focus:outline-none leading-relaxed font-sans"
                 />
               </div>
             </>
           ) : (
-            <EmptyState
-              icon={FileText}
-              title="No note selected"
-              description={selectedSubjectId ? `No notes in course "${activeSubjectName}". Create one to begin.` : "Select a study note from the left sidebar or create a new one to begin editing."}
-              action={{
-                label: 'Create Note',
-                onClick: handleCreateNewNote,
-              }}
-            />
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+              <div className="w-14 h-14 rounded-2xl bg-[var(--color-bg-elevated,#24241E)] border border-[var(--color-border,#36362F)] flex items-center justify-center mb-4 text-[#8E9B7A]">
+                <FileText className="w-7 h-7" strokeWidth={1.5} />
+              </div>
+              <h3 className="text-sm font-bold text-[var(--color-text-primary,#FFFBF4)] font-display">
+                {selectedSubjectId ? `No note selected in ${activeSubjectName}` : 'No note selected'}
+              </h3>
+              <p className="text-xs text-[#8D8777] max-w-sm mt-1 mb-6 leading-relaxed">
+                Select a note from the sidebar, create a new blank note, or upload a PDF document to extract notes automatically.
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <button
+                  onClick={handleCreateNewNote}
+                  className="sh-btn-primary px-4 py-2 text-xs gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Create Blank Note</span>
+                </button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingDoc}
+                  className="sh-btn-secondary px-4 py-2 text-xs gap-1.5 border border-[#8E9B7A]/40 text-[#D8CFBC] hover:border-[#8E9B7A]"
+                >
+                  <Upload className="w-4 h-4 text-[#8E9B7A]" />
+                  <span>Upload PDF / Document</span>
+                </button>
+              </div>
+            </div>
           )}
         </div>
 

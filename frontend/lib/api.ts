@@ -168,6 +168,13 @@ class ApiClient {
     });
   }
 
+  async uploadNoteDocument(formData: FormData) {
+    return this.request<any>('/notes/upload', {
+      method: 'POST',
+      body: formData,
+    });
+  }
+
   async updateNote(id: number, data: { title?: string; content?: string; subject_id?: number | null }) {
     return this.request<any>(`/notes/${id}`, {
       method: 'PUT',

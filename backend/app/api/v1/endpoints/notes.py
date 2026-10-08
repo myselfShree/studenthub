@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
@@ -50,6 +50,45 @@ def create_note(
             )
 
     return note_service.create(db, user_id=current_user.id, note_in=note_in)
+
+@router.post("/upload", response_model=NoteResponse, status_code=status.HTTP_201_CREATED)
+async def upload_note_document(
+    file: UploadFile = File(...),
+    subject_id: Optional[int] = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Upload a study document (PDF, TXT, MD, etc.) to automatically extract content and create a note.
+    """
+    if subject_id:
+        subject = subject_service.get_by_id(db, subject_id=subject_id, user_id=current_user.id)
+        if not subject:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Subject not found or does not belong to you"
+            )
+
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is empty."
+        )
+
+    if len(file_bytes) > 50 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File size exceeds the 50MB limit."
+        )
+
+    return note_service.create_from_upload(
+        db,
+        user_id=current_user.id,
+        filename=file.filename or "Uploaded Note",
+        file_bytes=file_bytes,
+        subject_id=subject_id
+    )
 
 @router.get("/{note_id}", response_model=NoteResponse)
 def get_note(
