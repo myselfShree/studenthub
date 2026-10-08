@@ -130,7 +130,7 @@ class AIService:
             }
         }
 
-        with httpx.Client(timeout=4.0) as client:
+        with httpx.Client(timeout=12.0) as client:
             for model_name in models_to_try:
                 clean_model = model_name.replace("models/", "")
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={api_key}"
