@@ -19,10 +19,10 @@ from app.schemas.ai import (
 logger = logging.getLogger("studenthub.ai")
 
 SUPPORTED_MODELS = [
-    "gemini-1.5-flash",
-    "gemini-2.0-flash",
-    "gemini-1.5-pro",
-    "gemini-pro"
+    "gemini-3.8-flash",        # Latest recommended by Google
+    "gemini-2.5-flash",        # Fast & capable
+    "gemini-2.5-flash-lite",   # Lightweight fallback
+    "gemini-2.5-pro",          # Most capable
 ]
 
 
