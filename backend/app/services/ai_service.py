@@ -70,16 +70,33 @@ class AIService:
                     for m in data.get("models", []):
                         methods = m.get("supportedGenerationMethods", [])
                         name = m.get("name", "").replace("models/", "")
+                        # Exclude non-text/TTS audio models
                         if "generateContent" in methods and "gemini" in name:
-                            models.append(name)
+                            if "-tts" not in name and "embed" not in name:
+                                models.append(name)
+                    
+                    # Sort so flash-latest and general text models come first
+                    def rank(m_name: str) -> int:
+                        n = m_name.lower()
+                        if "flash-latest" in n:
+                            return 1
+                        if "flash-lite-latest" in n:
+                            return 2
+                        if "flash" in n and "preview" not in n:
+                            return 3
+                        if "pro" in n and "preview" not in n:
+                            return 4
+                        return 10
+
+                    models.sort(key=rank)
                     if models:
                         self._discovered_models = models
-                        logger.info(f"Discovered {len(models)} Gemini models: {models[:4]}")
+                        logger.info(f"Discovered and prioritized {len(models)} Gemini models: {models}")
                         return models
         except Exception as exc:
             logger.debug(f"Dynamic model discovery failed: {exc}")
         
-        return DEFAULT_CANDIDATE_MODELS
+        return ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-1.5-flash-latest", "gemini-pro-latest"]
 
     def _call_gemini_resilient(self, prompt: str) -> Optional[str]:
         """Tries discovered/candidate models in order using direct REST requests."""
@@ -87,7 +104,7 @@ class AIService:
         if not api_key:
             return None
 
-        # Google Gemini API keys always start with AIzaSy
+        # Google Gemini API keys always start with AIza
         if not api_key.startswith("AIza"):
             logger.warning("Configured GEMINI_API_KEY does not start with 'AIza'. Skipping live network call.")
             self._last_error = "Invalid key format: Gemini API keys must start with 'AIzaSy...'"
@@ -95,10 +112,10 @@ class AIService:
 
         models_to_try = self._discover_models(api_key)
         if not models_to_try:
-            models_to_try = DEFAULT_CANDIDATE_MODELS
+            models_to_try = ["gemini-flash-latest", "gemini-flash-lite-latest"]
 
-        # Limit to top 3 models to avoid slow cascaded timeouts
-        models_to_try = models_to_try[:3]
+        # Limit to top 4 sorted text models
+        models_to_try = models_to_try[:4]
 
         last_errors = []
         payload = {
