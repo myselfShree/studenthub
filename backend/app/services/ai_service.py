@@ -36,6 +36,7 @@ class AIService:
         self._gemini_models = {}
         self._active_model_name = None
         self._initialized = False
+        self._last_error = None
 
     def get_api_key(self) -> str:
         """Find Gemini API key from multiple possible env var names."""
@@ -89,20 +90,28 @@ class AIService:
         if not api_key:
             return None
 
+        last_errors = []
         for model_name in SUPPORTED_MODELS:
             model = self._get_model(model_name)
             if not model:
+                last_errors.append(f"{model_name}: could not instantiate")
                 continue
             try:
                 response = model.generate_content(prompt)
                 if response and hasattr(response, "text") and response.text:
                     self._active_model_name = model_name
+                    self._last_error = None
                     return response.text
+                else:
+                    last_errors.append(f"{model_name}: empty/blocked response")
             except Exception as exc:
-                logger.warning(f"Model {model_name} failed: {exc}. Trying next model...")
+                err_msg = str(exc)
+                last_errors.append(f"{model_name}: {err_msg}")
+                logger.warning(f"Model {model_name} failed: {err_msg}. Trying next...")
                 continue
 
-        logger.error("All Gemini models failed or key is invalid/quota exhausted.")
+        self._last_error = " | ".join(last_errors)
+        logger.error(f"All Gemini models failed. Errors: {self._last_error}")
         return None
 
     def get_status(self) -> Dict[str, Any]:
@@ -112,6 +121,7 @@ class AIService:
             "has_key": bool(key),
             "key_prefix": f"{key[:6]}..." if key else "none",
             "active_model": self._active_model_name or "none",
+            "last_error": self._last_error,
             "supported_models": SUPPORTED_MODELS,
             "mode": "live_gemini" if bool(key) else "heuristic_fallback"
         }
