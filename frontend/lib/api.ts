@@ -98,8 +98,22 @@ class ApiClient {
   }
 
   // Authentication
-  async register(data: { name: string; email: string; password: string }) {
+  async register(data: { name: string; email: string; password: string; phone_number?: string }) {
     return this.request<any>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async verifyRegistrationOTP(data: { email: string; email_otp: string; phone_otp?: string }) {
+    return this.request<any>('/auth/verify-registration-otp', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async resendOTP(data: { email: string; otp_type?: string }) {
+    return this.request<any>('/auth/resend-otp', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -112,11 +126,25 @@ class ApiClient {
     });
   }
 
+  async verifyLoginMFA(data: { mfa_token: string; otp: string }) {
+    return this.request<any>('/auth/verify-login-mfa', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async toggleMFA(data: { mfa_enabled: boolean }) {
+    return this.request<any>('/auth/mfa/toggle', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   async getMe() {
     return this.request<any>('/auth/me');
   }
 
-  async updateProfile(data: { name?: string; email?: string; password?: string }) {
+  async updateProfile(data: { name?: string; email?: string; phone_number?: string; password?: string }) {
     return this.request<any>('/auth/me', {
       method: 'PUT',
       body: JSON.stringify(data),

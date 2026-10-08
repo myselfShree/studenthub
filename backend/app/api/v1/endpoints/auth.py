@@ -1,16 +1,21 @@
 import logging
+from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import create_access_token
 from app.services.user_service import user_service
 from app.services.email_service import send_password_reset_email
+from app.services.otp_service import otp_service
 from app.schemas.user import (
     UserRegister, UserLogin, UserUpdate,
-    UserResponse, Token,
+    UserResponse, Token, LoginResponse,
     ForgotPasswordRequest, ResetPasswordRequest,
+    VerifyRegistrationOTPRequest, ResendOTPRequest,
+    VerifyLoginMFARequest, MFAToggleRequest,
 )
 from app.api.deps import get_current_active_user
 from app.models.user import User
@@ -24,22 +29,65 @@ router = APIRouter()
 
 @router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
 def register(user_in: UserRegister, db: Session = Depends(get_db)):
-    """Create a new account with strict username and password validation."""
+    """Create a new account and automatically dispatch Email & Mobile OTPs."""
     if user_service.get_by_email(db, email=user_in.email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="An account with this email already exists.",
         )
     user = user_service.create_user(db, user_in=user_in)
+
+    # Generate and dispatch 6-digit OTPs
+    try:
+        otp_service.generate_and_store_registration_otps(db, user)
+    except Exception as exc:
+        logger.warning(f"Error dispatching registration OTP: {exc}")
+
     token = create_access_token(subject=user.id)
     return {"access_token": token, "token_type": "bearer", "user": user}
 
 
-# ── Login (JSON) ─────────────────────────────────────────────────────────────
+# ── Verify Registration OTP ──────────────────────────────────────────────────
 
-@router.post("/login", response_model=Token)
+@router.post("/verify-registration-otp", response_model=Token)
+def verify_registration_otp(payload: VerifyRegistrationOTPRequest, db: Session = Depends(get_db)):
+    """Verify 6-digit Email and Mobile OTPs to activate account."""
+    user = user_service.get_by_email(db, email=payload.email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User account not found.")
+
+    success, message = otp_service.verify_registration_otps(
+        db,
+        user=user,
+        email_otp=payload.email_otp,
+        phone_otp=payload.phone_otp
+    )
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+
+    token = create_access_token(subject=user.id)
+    return {"access_token": token, "token_type": "bearer", "user": user}
+
+
+# ── Resend Registration / Verification OTP ───────────────────────────────────
+
+@router.post("/resend-otp", status_code=200)
+def resend_otp(payload: ResendOTPRequest, db: Session = Depends(get_db)):
+    """Resend a fresh 6-digit verification code to the registered email/mobile."""
+    user = user_service.get_by_email(db, email=payload.email)
+    if not user:
+        # Enumeration safe: return success message
+        return {"message": "If an account exists, a new verification code has been dispatched."}
+
+    otp_service.generate_and_store_registration_otps(db, user)
+    return {"message": "A new verification code has been sent to your email and mobile."}
+
+
+# ── Login (JSON with optional 2FA / MFA) ─────────────────────────────────────
+
+@router.post("/login", response_model=LoginResponse)
 def login(user_in: UserLogin, db: Session = Depends(get_db)):
-    """Authenticate with email + password and return a JWT token."""
+    """Authenticate with email + password. Returns JWT or prompts for MFA OTP."""
     user = user_service.authenticate(db, email=user_in.email, password=user_in.password)
     if not user:
         raise HTTPException(
@@ -50,19 +98,73 @@ def login(user_in: UserLogin, db: Session = Depends(get_db)):
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Account is inactive.")
 
+    # Check if user has Two-Factor Authentication enabled
+    if user.mfa_enabled:
+        otp_service.generate_and_store_login_otp(db, user)
+        # Short-lived 10-minute temporary MFA token
+        mfa_token = create_access_token(
+            subject=f"mfa:{user.id}",
+            expires_delta=timedelta(minutes=10)
+        )
+        return LoginResponse(
+            mfa_required=True,
+            mfa_token=mfa_token,
+            message="Two-Factor Authentication is enabled. Please enter the 6-digit code sent to your email and mobile."
+        )
+
     token = create_access_token(subject=user.id)
-    return {"access_token": token, "token_type": "bearer", "user": user}
+    return LoginResponse(
+        access_token=token,
+        token_type="bearer",
+        user=UserResponse.model_validate(user),
+        mfa_required=False
+    )
 
 
-# ── Login (OAuth2 form — Swagger only) ──────────────────────────────────────
+# ── Verify Login MFA OTP ────────────────────────────────────────────────────
 
-@router.post("/login/token", response_model=Token, include_in_schema=False)
-def login_swagger(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = user_service.authenticate(db, email=form_data.username, password=form_data.password)
+@router.post("/verify-login-mfa", response_model=Token)
+def verify_login_mfa(payload: VerifyLoginMFARequest, db: Session = Depends(get_db)):
+    """Verify 2FA code from login and issue final JWT access token."""
+    try:
+        decoded = jwt.decode(
+            payload.mfa_token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM]
+        )
+        sub = decoded.get("sub")
+        if not sub or not str(sub).startswith("mfa:"):
+            raise HTTPException(status_code=400, detail="Invalid MFA session token.")
+        user_id = int(str(sub).replace("mfa:", ""))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid or expired MFA session. Please log in again.")
+
+    user = user_service.get_by_id(db, user_id=user_id)
     if not user:
-        raise HTTPException(status_code=401, detail="Incorrect email or password.")
+        raise HTTPException(status_code=404, detail="User account not found.")
+
+    success, message = otp_service.verify_login_otp(db, user=user, otp_code=payload.otp)
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+
     token = create_access_token(subject=user.id)
     return {"access_token": token, "token_type": "bearer", "user": user}
+
+
+# ── Toggle MFA (Profile Setting) ────────────────────────────────────────────
+
+@router.post("/mfa/toggle", response_model=UserResponse)
+def toggle_mfa(
+    payload: MFAToggleRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Enable or disable Two-Factor Authentication (MFA) for the current user."""
+    current_user.mfa_enabled = payload.mfa_enabled
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
 
 
 # ── Forgot password ──────────────────────────────────────────────────────────

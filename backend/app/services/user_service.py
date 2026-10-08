@@ -45,8 +45,12 @@ class UserService:
         db_user = User(
             name=user_in.name.strip(),
             email=user_in.email.lower().strip(),
+            phone_number=user_in.phone_number.strip() if user_in.phone_number else None,
             password_hash=get_password_hash(user_in.password),
             is_active=True,
+            is_email_verified=False,
+            is_phone_verified=False,
+            mfa_enabled=False,
             failed_login_attempts=0,
         )
         db.add(db_user)
@@ -87,6 +91,8 @@ class UserService:
             db_user.name = user_in.name.strip()
         if user_in.email is not None:
             db_user.email = user_in.email.lower().strip()
+        if user_in.phone_number is not None:
+            db_user.phone_number = user_in.phone_number.strip() if user_in.phone_number else None
         if user_in.password is not None:
             db_user.password_hash = get_password_hash(user_in.password)
         db.commit()

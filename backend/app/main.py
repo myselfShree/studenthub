@@ -31,15 +31,23 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Metadata create_all: {e}")
 
-    # 2. Add security columns to users table if not already present (PostgreSQL safe idempotence)
+    # 2. Add security & MFA columns to users table if not already present (PostgreSQL safe idempotence)
     try:
-        logger.info("Ensuring users table security columns exist...")
+        logger.info("Ensuring users table security & MFA columns exist...")
         with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number VARCHAR(30);"))
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_email_verified BOOLEAN DEFAULT FALSE;"))
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_phone_verified BOOLEAN DEFAULT FALSE;"))
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled BOOLEAN DEFAULT FALSE;"))
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_otp VARCHAR(10);"))
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_otp_expires_at TIMESTAMPTZ;"))
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_otp VARCHAR(10);"))
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_otp_expires_at TIMESTAMPTZ;"))
             conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_token VARCHAR(255);"))
             conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_token_expires TIMESTAMPTZ;"))
             conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER DEFAULT 0;"))
             conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;"))
-        logger.info("Security columns ensured.")
+        logger.info("Security & MFA columns ensured.")
     except Exception as e:
         logger.warning(f"Users column migration notice: {e}")
 

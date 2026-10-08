@@ -393,3 +393,129 @@ def test_user_profile_update_validation():
     # Updating with weak password
     weak_pw_upd = client.put("/api/v1/auth/me", json={"password": "weak"}, headers={"Authorization": f"Bearer {token}"})
     assert weak_pw_upd.status_code == 422
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 6. MULTI-FACTOR AUTHENTICATION (MFA) & OTP TESTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def test_registration_with_phone_number_and_otp_generation(unique_user_payload):
+    """Registration with phone number generates email & phone OTPs in DB."""
+    unique_user_payload["phone_number"] = "+919876543210"
+    reg_res = client.post("/api/v1/auth/register", json=unique_user_payload)
+    assert reg_res.status_code == 201
+
+    with TestingSessionLocal() as db:
+        user = db.query(User).filter(User.email == unique_user_payload["email"]).first()
+        assert user is not None
+        assert user.phone_number == "+919876543210"
+        assert user.email_otp is not None
+        assert len(user.email_otp) == 6
+        assert user.phone_otp is not None
+        assert len(user.phone_otp) == 6
+        assert user.is_email_verified is False
+
+
+def test_verify_registration_otp_success(unique_user_payload):
+    """Valid email & phone OTPs activate the user and mark contacts verified."""
+    unique_user_payload["phone_number"] = "+919876543210"
+    client.post("/api/v1/auth/register", json=unique_user_payload)
+
+    with TestingSessionLocal() as db:
+        user = db.query(User).filter(User.email == unique_user_payload["email"]).first()
+        e_otp = user.email_otp
+        p_otp = user.phone_otp
+
+    # Verify OTP endpoint
+    verify_res = client.post("/api/v1/auth/verify-registration-otp", json={
+        "email": unique_user_payload["email"],
+        "email_otp": e_otp,
+        "phone_otp": p_otp,
+    })
+    assert verify_res.status_code == 200
+    assert "access_token" in verify_res.json()
+
+    with TestingSessionLocal() as db:
+        user = db.query(User).filter(User.email == unique_user_payload["email"]).first()
+        assert user.is_email_verified is True
+        assert user.is_phone_verified is True
+        assert user.email_otp is None  # Single-use cleared
+
+
+def test_verify_registration_otp_invalid_code(unique_user_payload):
+    """Incorrect OTP must be rejected with 400."""
+    client.post("/api/v1/auth/register", json=unique_user_payload)
+
+    verify_res = client.post("/api/v1/auth/verify-registration-otp", json={
+        "email": unique_user_payload["email"],
+        "email_otp": "000000",
+    })
+    assert verify_res.status_code == 400
+    assert "incorrect" in verify_res.json()["detail"].lower()
+
+
+def test_resend_otp_endpoint(unique_user_payload):
+    """Resend OTP updates the stored codes."""
+    client.post("/api/v1/auth/register", json=unique_user_payload)
+
+    resend_res = client.post("/api/v1/auth/resend-otp", json={
+        "email": unique_user_payload["email"],
+        "otp_type": "all",
+    })
+    assert resend_res.status_code == 200
+    assert "sent" in resend_res.json()["message"].lower()
+
+
+def test_mfa_toggle_and_login_challenge_flow(unique_user_payload):
+    """
+    Complete MFA login flow:
+    1. Register user & get token
+    2. Toggle MFA enabled (POST /api/v1/auth/mfa/toggle)
+    3. Login with password -> returns mfa_required=True & mfa_token
+    4. Call /verify-login-mfa with invalid code -> rejected
+    5. Call /verify-login-mfa with valid code -> returns final JWT access token
+    """
+    reg = client.post("/api/v1/auth/register", json=unique_user_payload).json()
+    token = reg["access_token"]
+
+    # 1. Enable MFA
+    toggle_res = client.post("/api/v1/auth/mfa/toggle", json={"mfa_enabled": True}, headers={"Authorization": f"Bearer {token}"})
+    assert toggle_res.status_code == 200
+    assert toggle_res.json()["mfa_enabled"] is True
+
+    # 2. Login -> MFA challenge
+    login_res = client.post("/api/v1/auth/login", json={
+        "email": unique_user_payload["email"],
+        "password": unique_user_payload["password"]
+    })
+    assert login_res.status_code == 200
+    login_data = login_res.json()
+    assert login_data["mfa_required"] is True
+    assert login_data["mfa_token"] is not None
+
+    mfa_token = login_data["mfa_token"]
+
+    # 3. Verify with wrong code -> 400
+    bad_verify = client.post("/api/v1/auth/verify-login-mfa", json={
+        "mfa_token": mfa_token,
+        "otp": "999999"
+    })
+    assert bad_verify.status_code == 400
+
+    # 4. Get active OTP from DB and verify successfully
+    with TestingSessionLocal() as db:
+        user = db.query(User).filter(User.email == unique_user_payload["email"]).first()
+        valid_otp = user.email_otp
+
+    good_verify = client.post("/api/v1/auth/verify-login-mfa", json={
+        "mfa_token": mfa_token,
+        "otp": valid_otp
+    })
+    assert good_verify.status_code == 200
+    assert "access_token" in good_verify.json()
+    final_token = good_verify.json()["access_token"]
+
+    # 5. Access protected route with final token
+    me_res = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {final_token}"})
+    assert me_res.status_code == 200
+    assert me_res.json()["email"] == unique_user_payload["email"]

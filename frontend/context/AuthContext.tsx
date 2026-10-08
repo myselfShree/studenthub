@@ -9,8 +9,9 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<any>;
+  register: (name: string, email: string, password: string, phone_number?: string) => Promise<any>;
+  setSession: (token: string, user: User) => void;
   logout: () => void;
   setUser: (user: User) => void;
 }
@@ -39,22 +40,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const data: AuthResponse = await api.login({ email, password });
-    setToken(data.access_token);
-    setUserState(data.user);
-    localStorage.setItem('studenthub_token', data.access_token);
-    localStorage.setItem('studenthub_user', JSON.stringify(data.user));
+  const setSession = (accessToken: string, userObj: User) => {
+    setToken(accessToken);
+    setUserState(userObj);
+    localStorage.setItem('studenthub_token', accessToken);
+    localStorage.setItem('studenthub_user', JSON.stringify(userObj));
     router.push('/dashboard');
   };
 
-  const register = async (name: string, email: string, password: string) => {
-    const data: AuthResponse = await api.register({ name, email, password });
-    setToken(data.access_token);
-    setUserState(data.user);
-    localStorage.setItem('studenthub_token', data.access_token);
-    localStorage.setItem('studenthub_user', JSON.stringify(data.user));
-    router.push('/dashboard');
+  const login = async (email: string, password: string) => {
+    const data = await api.login({ email, password });
+    if (data.mfa_required) {
+      return data;
+    }
+    if (data.access_token && data.user) {
+      setSession(data.access_token, data.user);
+    }
+    return data;
+  };
+
+  const register = async (name: string, email: string, password: string, phone_number?: string) => {
+    const data = await api.register({ name, email, password, phone_number });
+    return data;
   };
 
   const logout = () => {
@@ -71,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, setUser }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, setSession, logout, setUser }}>
       {children}
     </AuthContext.Provider>
   );

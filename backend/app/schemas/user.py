@@ -41,15 +41,33 @@ def validate_password_str(value: str) -> str:
     return value
 
 
+# Phone validation: allows optional +, digits, min 10 max 15 digits
+PHONE_REGEX = re.compile(r"^\+?[0-9]{10,15}$")
+
+def validate_phone_str(value: Optional[str]) -> Optional[str]:
+    if not value or not str(value).strip():
+        return None
+    cleaned = str(value).strip().replace(" ", "").replace("-", "")
+    if not PHONE_REGEX.match(cleaned):
+        raise ValueError("Invalid phone number format. Provide 10-15 digits (e.g. +919876543210 or 9876543210).")
+    return cleaned
+
+
 # Base User Properties
 class UserBase(BaseModel):
     name: str = Field(..., min_length=2, max_length=30, examples=["Shrikant"])
     email: EmailStr = Field(..., examples=["shrikant@studenthub.dev"])
+    phone_number: Optional[str] = Field(None, examples=["+919876543210"])
 
     @field_validator("name")
     @classmethod
     def validate_name(cls, v: str) -> str:
         return validate_username_str(v)
+
+    @field_validator("phone_number")
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        return validate_phone_str(v)
 
 
 # User Registration Payload
@@ -72,6 +90,7 @@ class UserLogin(BaseModel):
 class UserUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=2, max_length=30)
     email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
     password: Optional[str] = Field(None, min_length=8, max_length=100)
 
     @field_validator("name")
@@ -80,6 +99,11 @@ class UserUpdate(BaseModel):
         if v is not None:
             return validate_username_str(v)
         return v
+
+    @field_validator("phone_number")
+    @classmethod
+    def validate_update_phone(cls, v: Optional[str]) -> Optional[str]:
+        return validate_phone_str(v)
 
     @field_validator("password")
     @classmethod
@@ -93,6 +117,9 @@ class UserUpdate(BaseModel):
 class UserResponse(UserBase):
     id: int
     is_active: bool
+    is_email_verified: bool = False
+    is_phone_verified: bool = False
+    mfa_enabled: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -104,6 +131,40 @@ class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+
+# Login Response (supports immediate token or MFA prompt)
+class LoginResponse(BaseModel):
+    access_token: Optional[str] = None
+    token_type: str = "bearer"
+    user: Optional[UserResponse] = None
+    mfa_required: bool = False
+    mfa_token: Optional[str] = None
+    message: Optional[str] = None
+
+
+# Registration OTP Verification Request
+class VerifyRegistrationOTPRequest(BaseModel):
+    email: EmailStr
+    email_otp: str = Field(..., min_length=4, max_length=10, description="6-digit email OTP")
+    phone_otp: Optional[str] = Field(None, max_length=10, description="6-digit mobile OTP if registered")
+
+
+# Resend OTP Request
+class ResendOTPRequest(BaseModel):
+    email: EmailStr
+    otp_type: Optional[str] = Field("all", description="'email', 'phone', or 'all'")
+
+
+# Login 2FA Verification Request
+class VerifyLoginMFARequest(BaseModel):
+    mfa_token: str = Field(..., min_length=1, description="Temporary MFA session token from login")
+    otp: str = Field(..., min_length=4, max_length=10, description="6-digit 2FA code")
+
+
+# MFA Toggle Request
+class MFAToggleRequest(BaseModel):
+    mfa_enabled: bool
 
 
 # Token Data embedded in JWT sub
@@ -125,3 +186,4 @@ class ResetPasswordRequest(BaseModel):
     @classmethod
     def validate_reset_password(cls, v: str) -> str:
         return validate_password_str(v)
+

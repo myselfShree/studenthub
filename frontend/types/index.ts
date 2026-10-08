@@ -4,7 +4,11 @@ export interface User {
   id: number;
   name: string;
   email: string;
+  phone_number?: string | null;
   is_active: boolean;
+  is_email_verified?: boolean;
+  is_phone_verified?: boolean;
+  mfa_enabled?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -13,6 +17,15 @@ export interface AuthResponse {
   access_token: string;
   token_type: string;
   user: User;
+}
+
+export interface LoginResponse {
+  access_token?: string | null;
+  token_type: string;
+  user?: User | null;
+  mfa_required?: boolean;
+  mfa_token?: string | null;
+  message?: string | null;
 }
 
 export interface Subject {

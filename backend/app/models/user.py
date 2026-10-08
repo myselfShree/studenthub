@@ -14,7 +14,17 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    # Security fields
+    # Security & Verification fields
+    phone_number = Column(String(30), nullable=True)
+    is_email_verified = Column(Boolean, default=False, nullable=False)
+    is_phone_verified = Column(Boolean, default=False, nullable=False)
+    mfa_enabled = Column(Boolean, default=False, nullable=False)
+
+    email_otp = Column(String(10), nullable=True)
+    email_otp_expires_at = Column(DateTime(timezone=True), nullable=True)
+    phone_otp = Column(String(10), nullable=True)
+    phone_otp_expires_at = Column(DateTime(timezone=True), nullable=True)
+
     password_reset_token = Column(String(255), nullable=True, index=True)
     password_reset_token_expires = Column(DateTime(timezone=True), nullable=True)
     failed_login_attempts = Column(Integer, default=0, nullable=False)
