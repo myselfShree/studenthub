@@ -34,32 +34,60 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
 
   if (!isOpen || !user) return null;
 
+  const validateUsername = (val: string): string | null => {
+    const trimmed = val.trim();
+    if (!trimmed) return 'Username is required.';
+    if (trimmed.length < 2) return 'Username must be at least 2 characters long.';
+    if (trimmed.length > 30) return 'Username cannot exceed 30 characters.';
+    if (!/^[A-Za-z]+$/.test(trimmed)) {
+      if (/\d/.test(trimmed)) return 'Username must contain alphabets only. Numbers are not allowed.';
+      if (/\s/.test(trimmed)) return 'Username must contain alphabets only. Spaces are not allowed.';
+      return 'Username must contain alphabets only. Special characters are not allowed.';
+    }
+    return null;
+  };
+
+  const validatePassword = (val: string): string | null => {
+    if (val.length < 8) return 'Password must be at least 8 characters long.';
+    if (!/[A-Z]/.test(val)) return 'Password must contain at least one uppercase letter.';
+    if (!/[a-z]/.test(val)) return 'Password must contain at least one lowercase letter.';
+    if (!/\d/.test(val)) return 'Password must contain at least one number.';
+    if (!/[!@#$%^&*(),.?":{}|<>\-_+=\[\]\\/`~;']/.test(val)) {
+      return 'Password must contain at least one special character.';
+    }
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess('');
 
-    if (!name.trim()) {
-      setError('Name is required.');
+    const trimmedName = name.trim();
+    const usernameErr = validateUsername(trimmedName);
+    if (usernameErr) {
+      setError(usernameErr);
       return;
     }
+
     if (!email.trim()) {
-      setError('Email is required.');
+      setError('Email address is required.');
       return;
     }
 
     const payload: { name?: string; email?: string; password?: string } = {};
 
-    if (name.trim() !== user.name) {
-      payload.name = name.trim();
+    if (trimmedName !== user.name) {
+      payload.name = trimmedName;
     }
     if (email.trim().toLowerCase() !== user.email.toLowerCase()) {
       payload.email = email.trim().toLowerCase();
     }
 
     if (password) {
-      if (password.length < 6) {
-        setError('New password must be at least 6 characters.');
+      const pwErr = validatePassword(password);
+      if (pwErr) {
+        setError(pwErr);
         return;
       }
       if (password !== confirmPassword) {
@@ -135,18 +163,24 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             </div>
           )}
 
-          {/* Full Name */}
+          {/* Username */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-medium text-[var(--color-text-secondary,#D8CFBC)] flex items-center gap-1.5">
-              <UserIcon size={12} className="text-[#8E9B7A]" />
-              Full Name
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-medium text-[var(--color-text-secondary,#D8CFBC)] flex items-center gap-1.5">
+                <UserIcon size={12} className="text-[#8E9B7A]" />
+                Username
+              </label>
+              <span className="text-[10px] text-[var(--color-text-muted,#8D8777)]">Letters only (2-30)</span>
+            </div>
             <input
               type="text"
               required
               value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Shrikant Yadwad"
+              onChange={(e) => {
+                setName(e.target.value);
+                if (error) setError('');
+              }}
+              placeholder="e.g. Shrikant"
               className="sh-input text-xs"
             />
           </div>
@@ -161,7 +195,10 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
               type="email"
               required
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (error) setError('');
+              }}
               placeholder="name@university.edu"
               className="sh-input text-xs"
             />
@@ -183,8 +220,11 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 6 characters"
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (error) setError('');
+                  }}
+                  placeholder="Min. 8 chars (upper, lower, number, special)"
                   className="sh-input text-xs pr-8"
                 />
                 <button
@@ -205,7 +245,10 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    if (error) setError('');
+                  }}
                   placeholder="Re-enter new password"
                   className="sh-input text-xs"
                 />

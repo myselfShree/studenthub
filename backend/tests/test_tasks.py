@@ -7,10 +7,12 @@ from app.main import app
 client = TestClient(app)
 
 def create_authenticated_user_token(name_prefix="TaskUser"):
-    suffix = uuid.uuid4().hex[:8]
+    alpha_suffix = "".join([c for c in uuid.uuid4().hex if c.isalpha()])[:6].capitalize()
+    username = f"{name_prefix}{alpha_suffix}"
+    email_suffix = uuid.uuid4().hex[:6]
     payload = {
-        "name": f"{name_prefix} {suffix}",
-        "email": f"{name_prefix.lower()}_{suffix}@studenthub.dev",
+        "name": username,
+        "email": f"{name_prefix.lower()}_{email_suffix}@studenthub.dev",
         "password": "Password123!"
     }
     response = client.post("/api/v1/auth/register", json=payload)

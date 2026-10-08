@@ -410,15 +410,26 @@ html:not(.dark) {
 }
 
 html:not(.dark) body { background-color: #F5F2EC; color: #1A1A14; }
+html:not(.dark) h1, html:not(.dark) h2, html:not(.dark) h3, html:not(.dark) h4 { color: #1A1A14; }
+html:not(.dark) label { color: #4A4638; }
 html:not(.dark) .sh-card { background-color: #EDEAE2; border-color: #D4CEBF; color: #1A1A14; }
 html:not(.dark) .sh-card-elevated { background-color: #E4E0D6; border-color: #D4CEBF; color: #1A1A14; }
-html:not(.dark) .sh-input { background-color: #F5F2EC; border-color: #D4CEBF; color: #1A1A14; }
+html:not(.dark) .sh-input { background-color: #FBF9F4; border-color: #D4CEBF; color: #1A1A14; }
 html:not(.dark) .sh-input::placeholder { color: #736E5E; }
-html:not(.dark) .sh-select { background-color: #F5F2EC; border-color: #D4CEBF; color: #1A1A14; }
+html:not(.dark) .sh-select { background-color: #FBF9F4; border-color: #D4CEBF; color: #1A1A14; }
+html:not(.dark) .sh-btn-primary { background-color: #1A1A14; color: #FFFBF4; border-color: #1A1A14; }
+html:not(.dark) .sh-btn-primary:hover { background-color: #38362D; border-color: #38362D; }
 html:not(.dark) .sh-btn-secondary { background-color: #EDEAE2; color: #1A1A14; border-color: #D4CEBF; }
 html:not(.dark) .sh-btn-secondary:hover { background-color: #E4E0D6; border-color: #7A7565; }
-html:not(.dark) .sh-btn-sage { background-color: #E8EDE0; color: #5A7247; border-color: rgba(90,114,71,0.4); }
-html:not(.dark) .sh-btn-sage:hover { background-color: rgba(90,114,71,0.15); border-color: #5A7247; }
+html:not(.dark) .sh-btn-sage { background-color: #E8EDE0; color: #324D24; border-color: rgba(50,77,36,0.4); }
+html:not(.dark) .sh-btn-sage:hover { background-color: rgba(50,77,36,0.15); border-color: #324D24; }
+html:not(.dark) .sh-badge-sage { background-color: #E2EAD8; color: #324D24; border-color: rgba(50,77,36,0.3); }
+html:not(.dark) .sh-badge-olive { background-color: #E6E1D4; color: #4A4638; border-color: #D0CAB9; }
+html:not(.dark) .sh-alert-danger { background-color: #FDF2F0; border-color: #F0B3AB; color: #B52B1B; }
+html:not(.dark) .sh-alert-success { background-color: #F2F8ED; border-color: #B3D6A5; color: #2F611E; }
+html:not(.dark) ::-webkit-scrollbar-track { background: #F5F2EC; }
+html:not(.dark) ::-webkit-scrollbar-thumb { background: #C8C2B0; border-radius: 3px; }
+html:not(.dark) ::-webkit-scrollbar-thumb:hover { background: #9E9785; }
 
 /* ══════════════════════════════════════════════════════════════
    HORIZONTAL FILTER SCROLLBAR

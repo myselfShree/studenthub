@@ -103,20 +103,33 @@ app.add_middleware(
 )
 
 
+from fastapi.encoders import jsonable_encoder
+
 @app.exception_handler(RequestValidationError)
 async def validation_error_handler(request: Request, exc: RequestValidationError):
+    # Extract friendly first error message if available
+    errors = exc.errors()
+    friendly_msg = "Validation Error"
+    if errors:
+        first = errors[0]
+        msg = first.get("msg", "")
+        # Remove 'Value error, ' prefix if present from Pydantic
+        if msg.startswith("Value error, "):
+            msg = msg[len("Value error, "):]
+        friendly_msg = msg or friendly_msg
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={"detail": "Validation Error", "errors": exc.errors()},
+        content={"detail": friendly_msg, "errors": jsonable_encoder(errors)},
     )
 
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled server error on {request.method} {request.url.path}: {exc}", exc_info=True)
+    # Mask raw exception string from clients in production to prevent DB schema / credentials leakage
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": str(exc)},
+        content={"detail": "An internal server error occurred. Please try again later."},
     )
 
 

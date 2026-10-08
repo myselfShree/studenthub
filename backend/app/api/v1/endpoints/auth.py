@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -15,6 +16,7 @@ from app.api.deps import get_current_active_user
 from app.models.user import User
 from app.core.config import settings
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -22,7 +24,7 @@ router = APIRouter()
 
 @router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
 def register(user_in: UserRegister, db: Session = Depends(get_db)):
-    """Create a new account and return a JWT token."""
+    """Create a new account with strict username and password validation."""
     if user_service.get_by_email(db, email=user_in.email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -68,31 +70,33 @@ def login_swagger(form_data: OAuth2PasswordRequestForm = Depends(), db: Session 
 @router.post("/forgot-password", status_code=200)
 def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
     """
-    Send a password-reset link to the given email.
-    If SMTP credentials are not configured, includes the reset link in the response.
+    Send a password-reset email if the account exists.
+    Enumeration-safe: Always returns the same response to prevent exposing registered emails.
+    Never exposes reset token or link in the API response.
     """
     user = user_service.get_by_email(db, email=payload.email)
-    reset_link = None
     if user and user.is_active:
         token = user_service.create_password_reset_token(db, user)
-        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
-        send_password_reset_email(
+        frontend_base = getattr(settings, "resolved_frontend_url", settings.FRONTEND_URL)
+        reset_link = f"{frontend_base}/reset-password?token={token}"
+        email_sent = send_password_reset_email(
             to_email=user.email,
             reset_link=reset_link,
-            user_name=user.name.split()[0],
+            user_name=user.name,
         )
-    
-    response_data = {"message": "If an account with that email exists, a reset link has been sent."}
-    if not settings.SMTP_USER and reset_link:
-        response_data["reset_link"] = reset_link
-    return response_data
+        if not email_sent:
+            logger.warning("Password reset email could not be delivered to %s (check SMTP settings)", user.email)
+
+    return {
+        "message": "If an account with that email exists, a password reset link has been sent to your email."
+    }
 
 
 # ── Reset password ───────────────────────────────────────────────────────────
 
 @router.post("/reset-password", status_code=200)
 def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
-    """Validate the reset token and set a new password."""
+    """Validate the single-use reset token and set a new password."""
     user = user_service.get_by_reset_token(db, token=payload.token)
     if not user:
         raise HTTPException(
@@ -100,13 +104,14 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
             detail="This reset link is invalid or has expired. Please request a new one.",
         )
     user_service.reset_password(db, user=user, new_password=payload.new_password)
-    return {"message": "Password updated. You can now log in."}
+    return {"message": "Password updated successfully. You can now log in with your new password."}
 
 
 # ── Profile ──────────────────────────────────────────────────────────────────
 
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_active_user)):
+    """Get authenticated user profile."""
     return current_user
 
 
@@ -116,14 +121,15 @@ def update_me(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    if user_in.email and user_in.email != current_user.email:
+    """Update profile details (name, email, password) for authenticated user."""
+    if user_in.email and user_in.email.lower().strip() != current_user.email.lower().strip():
         existing = user_service.get_by_email(db, email=user_in.email)
         if existing and existing.id != current_user.id:
-            raise HTTPException(status_code=400, detail="Email already in use.")
+            raise HTTPException(status_code=400, detail="Email already in use by another account.")
     return user_service.update_user(db, db_user=current_user, user_in=user_in)
 
 
 @router.post("/logout")
 def logout(current_user: User = Depends(get_current_active_user)):
-    """Stateless logout — client must discard the token."""
+    """Stateless logout confirmation."""
     return {"message": "Logged out successfully."}

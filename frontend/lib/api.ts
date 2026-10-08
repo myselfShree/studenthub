@@ -299,6 +299,14 @@ class ApiClient {
     });
   }
 
+  async getAIHistory(params?: { skip?: number; limit?: number }) {
+    const query = new URLSearchParams();
+    if (params?.skip !== undefined) query.append('skip', params.skip.toString());
+    if (params?.limit !== undefined) query.append('limit', params.limit.toString());
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return this.request<any[]>(`/ai/history${qs}`);
+  }
+
   // Resources
   async getResources(params?: { subject_id?: number; resource_type?: string; search?: string }) {
     const query = new URLSearchParams();

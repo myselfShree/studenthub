@@ -65,6 +65,15 @@ class Settings(BaseSettings):
     # CORS
     FRONTEND_URL: str = "http://localhost:3000"
 
+    @property
+    def resolved_frontend_url(self) -> str:
+        import os
+        if self.FRONTEND_URL and self.FRONTEND_URL.strip() != "http://localhost:3000":
+            return self.FRONTEND_URL.strip().rstrip("/")
+        if os.environ.get("RENDER") or self.APP_ENV == "production":
+            return "https://studenthub-amber.vercel.app"
+        return (self.FRONTEND_URL or "http://localhost:3000").strip().rstrip("/")
+
     model_config = SettingsConfigDict(
         env_file=str(BACKEND_DIR / ".env"),
         env_file_encoding="utf-8",
