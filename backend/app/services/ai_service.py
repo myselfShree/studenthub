@@ -16,26 +16,30 @@ from app.schemas.ai import (
     AIChatResponse,
 )
 
+import httpx
+
 logger = logging.getLogger("studenthub.ai")
 
-SUPPORTED_MODELS = [
-    "gemini-3.8-flash",        # Latest recommended by Google
-    "gemini-2.5-flash",        # Fast & capable
-    "gemini-2.5-flash-lite",   # Lightweight fallback
-    "gemini-2.5-pro",          # Most capable
+DEFAULT_CANDIDATE_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-pro",
+    "gemini-3.8-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
 ]
 
 
 class AIService:
     """
-    Gemini-backed AI study assistant with resilient multi-model fallback,
-    lazy initialisation, and environment key auto-detection.
+    Gemini-backed AI study assistant using direct REST API calls with
+    dynamic model discovery, multi-model fallback, and fast timeouts.
     """
 
     def __init__(self):
-        self._gemini_models = {}
         self._active_model_name = None
-        self._initialized = False
+        self._discovered_models: List[str] = []
         self._last_error = None
 
     def get_api_key(self) -> str:
@@ -51,66 +55,92 @@ class AIService:
         
         return ""
 
-    def _init_gemini(self) -> bool:
-        """Configures google.generativeai with API key."""
-        api_key = self.get_api_key()
-        if not api_key:
-            logger.info("No Gemini API key found in environment variables.")
-            return False
-
+    def _discover_models(self, api_key: str) -> List[str]:
+        """Dynamically fetch supported generateContent models from Gemini API."""
+        if self._discovered_models:
+            return self._discovered_models
+        
         try:
-            import google.generativeai as genai
-            genai.configure(api_key=api_key)
-            self._initialized = True
-            logger.info(f"Gemini configured with key prefix: {api_key[:6]}...")
-            return True
+            url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+            with httpx.Client(timeout=4.0) as client:
+                resp = client.get(url)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    models = []
+                    for m in data.get("models", []):
+                        methods = m.get("supportedGenerationMethods", [])
+                        name = m.get("name", "").replace("models/", "")
+                        if "generateContent" in methods and "gemini" in name:
+                            models.append(name)
+                    if models:
+                        self._discovered_models = models
+                        logger.info(f"Discovered {len(models)} Gemini models: {models[:4]}")
+                        return models
         except Exception as exc:
-            logger.warning(f"Failed to configure Gemini SDK: {exc}")
-            return False
-
-    def _get_model(self, model_name: str):
-        """Lazy load and cache GenerativeModel instance."""
-        if not self._initialized:
-            if not self._init_gemini():
-                return None
-
-        if model_name not in self._gemini_models:
-            try:
-                import google.generativeai as genai
-                self._gemini_models[model_name] = genai.GenerativeModel(model_name)
-            except Exception as exc:
-                logger.warning(f"Could not instantiate model {model_name}: {exc}")
-                return None
-
-        return self._gemini_models.get(model_name)
+            logger.debug(f"Dynamic model discovery failed: {exc}")
+        
+        return DEFAULT_CANDIDATE_MODELS
 
     def _call_gemini_resilient(self, prompt: str) -> Optional[str]:
-        """Tries configured models in order until one succeeds."""
+        """Tries discovered/candidate models in order using direct REST requests."""
         api_key = self.get_api_key()
         if not api_key:
             return None
 
-        last_errors = []
-        for model_name in SUPPORTED_MODELS:
-            model = self._get_model(model_name)
-            if not model:
-                last_errors.append(f"{model_name}: could not instantiate")
-                continue
-            try:
-                response = model.generate_content(prompt)
-                if response and hasattr(response, "text") and response.text:
-                    self._active_model_name = model_name
-                    self._last_error = None
-                    return response.text
-                else:
-                    last_errors.append(f"{model_name}: empty/blocked response")
-            except Exception as exc:
-                err_msg = str(exc)
-                last_errors.append(f"{model_name}: {err_msg}")
-                logger.warning(f"Model {model_name} failed: {err_msg}. Trying next...")
-                continue
+        # Google Gemini API keys always start with AIzaSy
+        if not api_key.startswith("AIza"):
+            logger.warning("Configured GEMINI_API_KEY does not start with 'AIza'. Skipping live network call.")
+            self._last_error = "Invalid key format: Gemini API keys must start with 'AIzaSy...'"
+            return None
 
-        self._last_error = " | ".join(last_errors)
+        models_to_try = self._discover_models(api_key)
+        if not models_to_try:
+            models_to_try = DEFAULT_CANDIDATE_MODELS
+
+        # Limit to top 3 models to avoid slow cascaded timeouts
+        models_to_try = models_to_try[:3]
+
+        last_errors = []
+        payload = {
+            "contents": [
+                {
+                    "parts": [{"text": prompt}]
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.7,
+                "maxOutputTokens": 2048,
+            }
+        }
+
+        with httpx.Client(timeout=4.0) as client:
+            for model_name in models_to_try:
+                clean_model = model_name.replace("models/", "")
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={api_key}"
+                try:
+                    resp = client.post(url, json=payload)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        candidates = data.get("candidates", [])
+                        if candidates:
+                            parts = candidates[0].get("content", {}).get("parts", [])
+                            if parts and "text" in parts[0]:
+                                text = parts[0]["text"]
+                                if text and text.strip():
+                                    self._active_model_name = clean_model
+                                    self._last_error = None
+                                    return text.strip()
+                        last_errors.append(f"{clean_model}: empty candidate text")
+                    else:
+                        err_summary = resp.text[:100].replace("\n", " ")
+                        last_errors.append(f"{clean_model}: HTTP {resp.status_code}")
+                        logger.warning(f"Model {clean_model} HTTP {resp.status_code}: {err_summary}")
+                except Exception as exc:
+                    err_msg = str(exc)[:60]
+                    last_errors.append(f"{clean_model}: {err_msg}")
+                    continue
+
+        self._last_error = " | ".join(last_errors[:3])
         logger.error(f"All Gemini models failed. Errors: {self._last_error}")
         return None
 
@@ -122,7 +152,7 @@ class AIService:
             "key_prefix": f"{key[:6]}..." if key else "none",
             "active_model": self._active_model_name or "none",
             "last_error": self._last_error,
-            "supported_models": SUPPORTED_MODELS,
+            "discovered_models": self._discovered_models[:6] if self._discovered_models else DEFAULT_CANDIDATE_MODELS[:4],
             "mode": "live_gemini" if bool(key) else "heuristic_fallback"
         }
 
