@@ -133,3 +133,34 @@ def update_me(
 def logout(current_user: User = Depends(get_current_active_user)):
     """Stateless logout confirmation."""
     return {"message": "Logged out successfully."}
+
+
+# ── SMTP diagnostic (auth required, never exposes password) ─────────────────
+
+@router.get("/smtp-status")
+def smtp_status(current_user: User = Depends(get_current_active_user)):
+    """
+    Diagnostic: check whether SMTP credentials are configured on this server.
+    Returns config status WITHOUT exposing the actual password.
+    """
+    from app.services.email_service import clean_smtp_credentials
+    smtp_user, smtp_password = clean_smtp_credentials()
+    user_configured = bool(smtp_user)
+    password_configured = bool(smtp_password)
+    return {
+        "smtp_host": settings.SMTP_HOST,
+        "smtp_port": settings.SMTP_PORT,
+        "smtp_user_configured": user_configured,
+        "smtp_user_value": smtp_user if user_configured else "NOT SET",
+        "smtp_password_configured": password_configured,
+        "smtp_password_length": len(smtp_password) if smtp_password else 0,
+        "frontend_url": getattr(settings, "resolved_frontend_url", settings.FRONTEND_URL),
+        "email_ready": user_configured and password_configured,
+        "fix_instructions": (
+            None if (user_configured and password_configured)
+            else (
+                "Set SMTP_USER=shreeyadwad@gmail.com and SMTP_PASSWORD=<your-16-char-gmail-app-password> "
+                "in your Render dashboard under Environment Variables, then redeploy."
+            )
+        ),
+    }
