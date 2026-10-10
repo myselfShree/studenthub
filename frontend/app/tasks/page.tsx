@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { SkeletonRow } from '@/components/Skeleton';
 import EmptyState from '@/components/EmptyState';
+import AuthPromptModal from '@/components/AuthPromptModal';
+import { useAuth } from '@/context/AuthContext';
 
 const PRIORITY_BADGE: Record<string, string> = {
   urgent: 'sh-badge-danger',
@@ -26,11 +28,49 @@ const PRIORITY_BADGE: Record<string, string> = {
   low:    'sh-badge-olive',
 };
 
+const SAMPLE_GUEST_TASKS: Task[] = [
+  {
+    id: 1,
+    title: 'Complete Computer Networks Packet Tracer Lab',
+    description: 'Configure OSPF and VLAN routing topology.',
+    priority: 'urgent',
+    status: 'pending',
+    user_id: 0,
+    due_date: new Date(Date.now() + 86400000).toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 2,
+    title: 'Prepare for Data Structures Mid-term Viva',
+    description: 'Review AVL trees, Dijkstra algorithm, and dynamic programming.',
+    priority: 'high',
+    status: 'pending',
+    user_id: 0,
+    due_date: new Date(Date.now() + 172800000).toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 3,
+    title: 'Read AI Research Paper on Multi-Agent Architecture',
+    description: 'Take structured Markdown notes in Smart Notes hub.',
+    priority: 'medium',
+    status: 'completed',
+    user_id: 0,
+    due_date: new Date(Date.now() + 259200000).toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+];
+
 export default function TasksPage() {
+  const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [priorityFilter, setPriorityFilter] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [authPromptOpen, setAuthPromptOpen] = useState(false);
 
   // New Task Dialog
   const [showModal, setShowModal] = useState(false);
@@ -47,7 +87,12 @@ export default function TasksPage() {
       });
       setTasks(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error(err);
+      if (!user) {
+        let filtered = SAMPLE_GUEST_TASKS;
+        if (statusFilter) filtered = filtered.filter(t => t.status === statusFilter);
+        if (priorityFilter) filtered = filtered.filter(t => t.priority === priorityFilter);
+        setTasks(filtered);
+      }
     } finally {
       setLoading(false);
     }
@@ -55,9 +100,13 @@ export default function TasksPage() {
 
   useEffect(() => {
     loadTasks();
-  }, [statusFilter, priorityFilter]);
+  }, [statusFilter, priorityFilter, user]);
 
   const handleToggleTask = async (task: Task) => {
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     try {
       const nextStatus = task.status === 'completed' ? 'pending' : 'completed';
       await api.updateTaskStatus(task.id, nextStatus);
@@ -69,6 +118,10 @@ export default function TasksPage() {
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     if (!title.trim()) return;
 
     try {
@@ -90,6 +143,10 @@ export default function TasksPage() {
   };
 
   const handleDeleteTask = async (id: number) => {
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     if (!confirm('Are you sure you want to delete this task?')) return;
     try {
       await api.deleteTask(id);
@@ -317,6 +374,13 @@ export default function TasksPage() {
           </div>
         </div>
       )}
+
+      <AuthPromptModal
+        isOpen={authPromptOpen}
+        onClose={() => setAuthPromptOpen(false)}
+        title="Sign in to manage and create tasks"
+        description="Sign up for free to organize your academic assignments, set deadlines, and track priorities."
+      />
     </AppLayout>
   );
 }

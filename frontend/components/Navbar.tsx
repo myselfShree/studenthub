@@ -73,22 +73,20 @@ export default function Navbar() {
         
         {/* Left: Hamburger (mobile) + Logo */}
         <div className="flex items-center gap-2.5 sm:gap-3">
-          {user && (
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg text-[var(--color-text-secondary,#D8CFBC)] hover:text-[var(--color-text-primary,#FFFBF4)] hover:bg-[var(--color-bg-elevated,#24241E)] transition-colors"
-              aria-label="Open workspace menu"
-            >
-              {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
-            </button>
-          )}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden p-2 rounded-lg text-[var(--color-text-secondary,#D8CFBC)] hover:text-[var(--color-text-primary,#FFFBF4)] hover:bg-[var(--color-bg-elevated,#24241E)] transition-colors"
+            aria-label="Open workspace menu"
+          >
+            {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
 
           <Link href="/dashboard" className="transition-opacity hover:opacity-90 flex items-center gap-2">
             <StudentHubLogo size={26} textSize="text-sm font-semibold tracking-wide font-display" />
           </Link>
         </div>
 
-        {/* Right: Theme Toggle + Profile Menu */}
+        {/* Right: Theme Toggle + Profile Menu / Guest Links */}
         <div className="flex items-center gap-1.5 sm:gap-3">
           {/* Light / Dark Mode Toggle */}
           <button
@@ -104,7 +102,7 @@ export default function Navbar() {
             )}
           </button>
 
-          {user && (
+          {user ? (
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setProfileOpen(!profileOpen)}
@@ -145,6 +143,21 @@ export default function Navbar() {
                   </button>
                 </div>
               )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Link
+                href="/login"
+                className="hidden sm:inline-block text-xs font-medium text-[var(--color-text-secondary,#D8CFBC)] hover:text-[var(--color-text-primary,#FFFBF4)] px-2.5 py-1.5 rounded transition-colors"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/register"
+                className="sh-btn-primary text-xs py-1.5 px-3 font-semibold"
+              >
+                Get Started
+              </Link>
             </div>
           )}
         </div>

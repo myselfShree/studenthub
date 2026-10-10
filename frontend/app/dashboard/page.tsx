@@ -13,12 +13,119 @@ import {
 import { SkeletonScorecard, SkeletonRow } from '@/components/Skeleton';
 import EmptyState from '@/components/EmptyState';
 
+import AuthPromptModal from '@/components/AuthPromptModal';
+import { useAuth } from '@/context/AuthContext';
+
 /* Priority badge using warm-neutral status tokens */
 const PRIORITY_BADGE: Record<string, string> = {
   urgent: 'sh-badge-danger',
   high:   'sh-badge-warning',
   medium: 'sh-badge-olive',
   low:    'sh-badge-olive',
+};
+
+const SAMPLE_DASHBOARD_DATA: DashboardOverview = {
+  student_name: 'Student (Guest)',
+  student_email: 'guest@studenthub.app',
+  metrics: {
+    total_subjects: 2,
+    total_notes: 3,
+    total_tasks: 2,
+    total_habits: 2,
+    total_files: 2,
+    total_resources: 1,
+    total_ai_interactions: 5,
+  },
+  tasks: {
+    pending_count: 2,
+    completed_count: 1,
+    urgent_count: 1,
+    upcoming_tasks: [
+      {
+        id: 101,
+        title: 'Review Operating System Deadlocks & Semaphores',
+        description: 'Read Chapter 5 and summarize key concurrency concepts.',
+        priority: 'urgent',
+        status: 'pending',
+        user_id: 0,
+        due_date: new Date(Date.now() + 86400000).toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      {
+        id: 102,
+        title: 'Complete Database Normalization Practice (3NF)',
+        description: 'Solve BCNF and 3NF decomposition problems.',
+        priority: 'medium',
+        status: 'pending',
+        user_id: 0,
+        due_date: new Date(Date.now() + 172800000).toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+    ],
+  },
+  habits: {
+    total_habits: 2,
+    completed_today_count: 1,
+    habits: [
+      {
+        id: 201,
+        name: 'Daily Algorithm Practice (LeetCode/GFG)',
+        target_frequency: 'daily',
+        current_streak: 5,
+        longest_streak: 12,
+        total_completions: 15,
+        recent_history: [],
+        user_id: 0,
+        completed_today: true,
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 202,
+        name: 'Read 30 mins Academic Literature / Research',
+        target_frequency: 'daily',
+        current_streak: 3,
+        longest_streak: 8,
+        total_completions: 8,
+        recent_history: [],
+        user_id: 0,
+        completed_today: false,
+        created_at: new Date().toISOString(),
+      }
+    ],
+  },
+  recent_notes: [
+    {
+      id: 301,
+      title: 'Operating Systems: Process Scheduling & Threads',
+      content: 'CPU scheduling deals with the problem of choosing which process in the ready queue is to be allocated the CPU.',
+      subject_id: 1,
+      user_id: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: 302,
+      title: 'Database Management: Indexing & B-Trees',
+      content: 'B-Trees and B+ Trees provide logarithmic search, insertion, and deletion for large scale databases.',
+      subject_id: 2,
+      user_id: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+  ],
+  recent_resources: [
+    {
+      id: 401,
+      title: 'Operating Systems Architecture Handbook',
+      url: 'https://github.com',
+      resource_type: 'github',
+      user_id: 0,
+      subject_id: 1,
+      created_at: new Date().toISOString(),
+    }
+  ],
 };
 
 const stagger = {
@@ -31,24 +138,35 @@ const stagger = {
 };
 
 export default function DashboardPage() {
+  const { user } = useAuth();
   const [data, setData] = useState<DashboardOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [authPromptOpen, setAuthPromptOpen] = useState(false);
 
   const loadDashboard = async () => {
     try {
       const summary = await api.getDashboardSummary();
       setData(summary);
     } catch (err: any) {
-      setError(err.message || 'Failed to load dashboard.');
+      // In guest preview or 401, fallback to sample dashboard overview
+      if (!user) {
+        setData(SAMPLE_DASHBOARD_DATA);
+      } else {
+        setError(err.message || 'Failed to load dashboard.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { loadDashboard(); }, []);
+  useEffect(() => { loadDashboard(); }, [user]);
 
   const handleToggleTask = async (taskId: number, currentStatus: string) => {
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     try {
       const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
       await api.updateTaskStatus(taskId, newStatus);
@@ -57,6 +175,10 @@ export default function DashboardPage() {
   };
 
   const handleHabitCheckin = async (habitId: number, completedToday: boolean) => {
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     try {
       if (completedToday) {
         await api.deleteCheckinHabit(habitId);
@@ -372,6 +494,13 @@ export default function DashboardPage() {
           </>
         )}
       </div>
+
+      <AuthPromptModal
+        isOpen={authPromptOpen}
+        onClose={() => setAuthPromptOpen(false)}
+        title="Sign in to save and update tasks"
+        description="Create your free Student Hub account to track habits, complete priority tasks, and sync across devices."
+      />
     </AppLayout>
   );
 }

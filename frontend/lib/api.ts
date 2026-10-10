@@ -40,7 +40,7 @@ class ApiClient {
           errorMessage = errorData.detail || errorData.message || errorMessage;
         } catch (_) {}
 
-        if (response.status === 401 && typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+        if (response.status === 401 && token && typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
           localStorage.removeItem('studenthub_token');
           localStorage.removeItem('studenthub_user');
           window.location.href = '/login';

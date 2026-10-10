@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import { SkeletonRow } from '@/components/Skeleton';
 import EmptyState from '@/components/EmptyState';
+import AuthPromptModal from '@/components/AuthPromptModal';
+import { useAuth } from '@/context/AuthContext';
 
 interface Habit {
   id: number;
@@ -46,7 +48,47 @@ const DEFAULT_SCHEDULE: ScheduleItem[] = [
   { id: '5', time: '09:00 PM', title: 'Daily 3-Point Review & Tomorrow Planning', completed: false },
 ];
 
+const SAMPLE_GUEST_HABITS: Habit[] = [
+  {
+    id: 1,
+    name: 'Solve 2 DSA Algorithm Problems',
+    description: 'Practice trees, graphs, dynamic programming.',
+    target_frequency: 'daily',
+    current_streak: 5,
+    longest_streak: 12,
+    total_completions: 24,
+    completed_today: true,
+    recent_history: [true, true, true, true, true, false, true],
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 2,
+    name: '30 Mins Coding / Project Development',
+    description: 'Work on full-stack web applications and APIs.',
+    target_frequency: 'daily',
+    current_streak: 8,
+    longest_streak: 15,
+    total_completions: 35,
+    completed_today: false,
+    recent_history: [true, true, false, true, true, true, true],
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 3,
+    name: 'Review Daily Notes & Flashcards',
+    description: 'Active recall for college subjects.',
+    target_frequency: 'daily',
+    current_streak: 4,
+    longest_streak: 9,
+    total_completions: 18,
+    completed_today: true,
+    recent_history: [false, true, true, true, true, true, false],
+    created_at: new Date().toISOString(),
+  }
+];
+
 export default function HabitsPage() {
+  const { user } = useAuth();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -54,6 +96,7 @@ export default function HabitsPage() {
   const [checkingIn, setCheckingIn] = useState<number | null>(null);
   const [form, setForm] = useState({ name: '', description: '', target_frequency: 'daily' });
   const [error, setError] = useState('');
+  const [authPromptOpen, setAuthPromptOpen] = useState(false);
 
   // Daily Schedule state (persisted per date in localStorage)
   const todayStr = new Date().toISOString().split('T')[0];
@@ -79,11 +122,15 @@ export default function HabitsPage() {
       const data = await api.get('/habits');
       setHabits(Array.isArray(data) ? data : []);
     } catch {
-      setError('Failed to load habits');
+      if (!user) {
+        setHabits(SAMPLE_GUEST_HABITS);
+      } else {
+        setError('Failed to load habits');
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   // Fetch journal for date
   const fetchJournal = useCallback(async (dateStr: string) => {
@@ -161,6 +208,10 @@ export default function HabitsPage() {
 
   const handleCreateHabit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     if (!form.name.trim()) return;
     setSubmitting(true);
     try {
@@ -176,6 +227,10 @@ export default function HabitsPage() {
   };
 
   const handleCheckin = async (habit: Habit) => {
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     setCheckingIn(habit.id);
     try {
       if (habit.completed_today) {
@@ -192,6 +247,10 @@ export default function HabitsPage() {
   };
 
   const handleDeleteHabit = async (id: number) => {
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     if (!confirm('Are you sure you want to delete this habit?')) return;
     try {
       await api.delete(`/habits/${id}`);
@@ -203,6 +262,10 @@ export default function HabitsPage() {
 
   const handleSaveJournal = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     setSavingJournal(true);
     try {
       await api.post('/journal', {
@@ -659,6 +722,13 @@ export default function HabitsPage() {
           </div>
         </div>
       )}
+
+      <AuthPromptModal
+        isOpen={authPromptOpen}
+        onClose={() => setAuthPromptOpen(false)}
+        title="Sign in to track study habits & streaks"
+        description="Sign up for free to build study streaks, plan your daily timetable, and maintain a 3-point reflection journal."
+      />
     </AppLayout>
   );
 }

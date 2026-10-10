@@ -11,6 +11,9 @@ import QRCode from 'react-qr-code';
 import { SkeletonRow } from '@/components/Skeleton';
 import EmptyState from '@/components/EmptyState';
 
+import AuthPromptModal from '@/components/AuthPromptModal';
+import { useAuth } from '@/context/AuthContext';
+
 interface FileItem {
   id: number;
   filename: string;
@@ -29,6 +32,33 @@ interface ShareItem {
   is_active: boolean;
 }
 
+const SAMPLE_GUEST_FILES: FileItem[] = [
+  {
+    id: 1,
+    filename: 'Data_Structures_Algorithm_CheatSheet.pdf',
+    file_size: 2450000,
+    mime_type: 'application/pdf',
+    created_at: new Date().toISOString(),
+    shares: [
+      {
+        id: 1,
+        share_token: 'demo-sample-share-token-1',
+        download_count: 3,
+        max_downloads: 10,
+        is_active: true,
+      }
+    ]
+  },
+  {
+    id: 2,
+    filename: 'Operating_Systems_Process_Concurrency_Lab.pdf',
+    file_size: 1120000,
+    mime_type: 'application/pdf',
+    created_at: new Date().toISOString(),
+    shares: []
+  }
+];
+
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -40,6 +70,7 @@ function formatDate(str: string) {
 }
 
 export default function FilesPage() {
+  const { user } = useAuth();
   const [files, setFiles] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -50,6 +81,7 @@ export default function FilesPage() {
   const [shareForm, setShareForm] = useState({ expires_hours: '24', max_downloads: '' });
   const [sharingFile, setSharingFile] = useState(false);
   const [error, setError] = useState('');
+  const [authPromptOpen, setAuthPromptOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchFiles = useCallback(async () => {
@@ -57,15 +89,23 @@ export default function FilesPage() {
       const data = await api.get('/files');
       setFiles(Array.isArray(data) ? data : []);
     } catch {
-      setError('Failed to load files');
+      if (!user) {
+        setFiles(SAMPLE_GUEST_FILES);
+      } else {
+        setError('Failed to load files');
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => { fetchFiles(); }, [fetchFiles]);
 
   const uploadFile = async (file: File) => {
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     setUploading(true);
     setError('');
     const formData = new FormData();
@@ -93,6 +133,10 @@ export default function FilesPage() {
   };
 
   const handleShare = async () => {
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     if (!shareModal) return;
     setSharingFile(true);
     try {
@@ -110,6 +154,10 @@ export default function FilesPage() {
   };
 
   const handleDelete = async (id: number) => {
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     if (!confirm('Are you sure you want to delete this file?')) return;
     try {
       await api.delete(`/files/${id}`);
@@ -400,6 +448,13 @@ export default function FilesPage() {
           </div>
         </div>
       )}
+
+      <AuthPromptModal
+        isOpen={authPromptOpen}
+        onClose={() => setAuthPromptOpen(false)}
+        title="Sign in to upload and share files"
+        description="Sign up for free to upload study PDFs, notes, generate scannable QR codes, and share materials with peers."
+      />
     </AppLayout>
   );
 }

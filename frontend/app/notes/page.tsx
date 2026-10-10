@@ -26,17 +26,47 @@ import {
   Paperclip
 } from 'lucide-react';
 import EmptyState from '@/components/EmptyState';
+import AuthPromptModal from '@/components/AuthPromptModal';
+import { useAuth } from '@/context/AuthContext';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
 }
 
+const SAMPLE_GUEST_SUBJECTS: Subject[] = [
+  { id: 1, name: 'Computer Science', color: '#8E9B7A', user_id: 0, created_at: new Date().toISOString() },
+  { id: 2, name: 'Software Engineering', color: '#C4975A', user_id: 0, created_at: new Date().toISOString() },
+];
+
+const SAMPLE_GUEST_NOTES: Note[] = [
+  {
+    id: 1,
+    title: 'Operating Systems: Process Scheduling & Deadlocks',
+    content: `# Operating Systems: Process Scheduling & Deadlocks\n\n## 1. Process Scheduling\nCPU Scheduling is the process of deciding which process gets CPU time while another is in wait state. The primary goal is to make the system efficient, fast, and fair.\n\n### Algorithms:\n- **First-Come, First-Served (FCFS)**: Simple FIFO queue. Non-preemptive.\n- **Shortest Job Next (SJN)**: Best average turnaround time.\n- **Round Robin (RR)**: Preemptive cyclic execution using a time quantum.\n\n## 2. Deadlock Coffman Conditions\nA deadlock state requires all 4 conditions:\n1. Mutual Exclusion\n2. Hold and Wait\n3. No Preemption\n4. Circular Wait`,
+    subject_id: 1,
+    user_id: 0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 2,
+    title: 'Database Management: Normalization (1NF to BCNF)',
+    content: `# Database Normalization\n\nNormalization is the systematic approach of organizing tables to eliminate data redundancy and undesirable anomalies (Insert, Update, Delete).\n\n- **1NF**: Atomic column values, unique records.\n- **2NF**: In 1NF and no partial dependencies.\n- **3NF**: In 2NF and no transitive functional dependencies.\n- **BCNF**: Strict form of 3NF where for every functional dependency X -> Y, X is a superkey.`,
+    subject_id: 2,
+    user_id: 0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+];
+
 export default function NotesPage() {
+  const { user } = useAuth();
   const [notes, setNotes] = useState<Note[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [authPromptOpen, setAuthPromptOpen] = useState(false);
   
   // Active Note in Editor
   const [activeNote, setActiveNote] = useState<Note | null>(null);
@@ -89,22 +119,26 @@ export default function NotesPage() {
       setSubjects(Array.isArray(subjectsRes) ? subjectsRes : []);
 
       if (safeNotes.length > 0) {
-        // If activeNote is null or not in the filtered list, switch to the first note of this filtered list
         if (!activeNote || !safeNotes.some(n => n.id === activeNote.id)) {
           selectNote(safeNotes[0]);
         }
       } else {
-        // No notes in this filter
         setActiveNote(null);
       }
     } catch (err) {
-      console.error(err);
+      if (!user) {
+        setNotes(SAMPLE_GUEST_NOTES);
+        setSubjects(SAMPLE_GUEST_SUBJECTS);
+        if (!activeNote) {
+          selectNote(SAMPLE_GUEST_NOTES[0]);
+        }
+      }
     }
   };
 
   useEffect(() => {
     loadData();
-  }, [selectedSubjectId, searchQuery]);
+  }, [selectedSubjectId, searchQuery, user]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -137,6 +171,10 @@ export default function NotesPage() {
   };
 
   const processUploadedFile = async (file: File) => {
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     setUploadingDoc(true);
     setUploadError('');
     try {
@@ -183,6 +221,10 @@ export default function NotesPage() {
   };
 
   const handleSaveNote = async () => {
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     if (!title.trim()) return;
     try {
       if (activeNote && activeNote.id > 0) {
@@ -209,6 +251,10 @@ export default function NotesPage() {
   };
 
   const handleDeleteNote = async (id: number) => {
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     if (!confirm('Are you sure you want to delete this note?')) return;
     try {
       await api.deleteNote(id);
@@ -221,6 +267,10 @@ export default function NotesPage() {
 
   const handleCreateSubject = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     if (!newSubjectName.trim()) return;
     try {
       await api.createSubject({ name: newSubjectName, color: newSubjectColor });
@@ -1018,6 +1068,13 @@ export default function NotesPage() {
           </div>
         </div>
       )}
+
+      <AuthPromptModal
+        isOpen={authPromptOpen}
+        onClose={() => setAuthPromptOpen(false)}
+        title="Sign in to create and save notes"
+        description="Sign up for free to create your own subjects, save Markdown notes, upload PDFs, and generate AI summaries & quizzes."
+      />
     </AppLayout>
   );
 }
