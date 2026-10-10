@@ -52,12 +52,15 @@ class Settings(BaseSettings):
     EMAIL_FROM: str = "noreply@studenthub.app"
     EMAIL_FROM_NAME: str = "Student Hub"
 
-    # Resend (recommended for production — works on Render free tier)
-    # Sign up free at https://resend.com → API Keys → Create Key
+    # Resend (alternative — requires verified domain for sending to all users)
     RESEND_API_KEY: Optional[str] = None
-    # For testing use: "Student Hub <onboarding@resend.dev>"
-    # For production use a verified domain: "Student Hub <noreply@yourdomain.com>"
     RESEND_FROM_EMAIL: Optional[str] = None
+
+    # Brevo / Sendinblue (RECOMMENDED — no domain needed, just verify sender Gmail)
+    # Sign up free at https://app.brevo.com → SMTP & API → API Keys
+    BREVO_API_KEY: Optional[str] = None
+    BREVO_SENDER_EMAIL: Optional[str] = None   # e.g. shreeyadwad@gmail.com (must be verified in Brevo)
+    BREVO_SENDER_NAME: str = "Student Hub"
 
     # Password reset token expiry
     PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 30

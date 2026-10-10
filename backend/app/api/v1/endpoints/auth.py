@@ -343,51 +343,79 @@ def test_email(current_user: User = Depends(get_current_active_user)):
 @router.get("/debug-smtp")
 def debug_email_public(to: str = "shreeyadwad@gmail.com"):
     """
-    PUBLIC endpoint (no login needed) — sends a test email via Resend and
+    PUBLIC endpoint (no login needed) — sends a test email via Brevo and
     returns the exact result so you can confirm email delivery is working.
 
     Usage: GET /api/v1/auth/debug-smtp?to=your@email.com
     """
-    resend_key = (getattr(settings, "RESEND_API_KEY", None) or "").strip()
+    import httpx as _httpx
 
-    if not resend_key:
+    brevo_key = (getattr(settings, "BREVO_API_KEY", None) or "").strip()
+    sender_email = (getattr(settings, "BREVO_SENDER_EMAIL", None) or "").strip()
+    sender_name = (getattr(settings, "BREVO_SENDER_NAME", None) or "Student Hub").strip()
+
+    if not brevo_key:
         return {
             "success": False,
-            "step": "credentials_check",
-            "error": "RESEND_API_KEY is NOT set on this server.",
+            "step": "no_brevo_key",
+            "error": "BREVO_API_KEY is NOT set on this server.",
             "fix": (
-                "1. Go to https://resend.com and sign up free (no credit card needed). "
-                "2. Click 'API Keys' → 'Create API Key' → copy the key. "
-                "3. In Render Dashboard → your backend → Environment → add RESEND_API_KEY = <your_key>. "
-                "4. Also add RESEND_FROM_EMAIL = 'Student Hub <onboarding@resend.dev>' for testing. "
+                "1. Go to https://app.brevo.com and sign up free (no credit card, no domain needed). "
+                "2. Go to Settings → Senders & IP → Add a Sender → add shreeyadwad@gmail.com → verify it. "
+                "3. Go to SMTP & API → API Keys → Create a new API key → copy it. "
+                "4. In Render Dashboard → your backend → Environment → add: "
+                "BREVO_API_KEY=<your_key>, BREVO_SENDER_EMAIL=shreeyadwad@gmail.com, BREVO_SENDER_NAME=Student Hub. "
                 "5. Save and redeploy, then try this URL again."
             ),
         }
 
-    try:
-        import resend
-        resend.api_key = resend_key
-
-        from_email = (getattr(settings, "RESEND_FROM_EMAIL", None) or "Student Hub <onboarding@resend.dev>").strip()
-
-        params: resend.Emails.SendParams = {
-            "from": from_email,
-            "to": [to],
-            "subject": "Student Hub — Email Delivery Test",
-            "html": "<p><b>Student Hub Email Test</b></p><p>If you received this, your email system is working correctly! OTP and password reset emails will now be delivered.</p>",
-        }
-        email = resend.Emails.send(params)
+    if not sender_email:
         return {
-            "success": True,
-            "message": f"Test email sent to {to} via Resend. Check your inbox (and spam folder).",
-            "resend_email_id": email.get("id", "unknown"),
-            "from": from_email,
+            "success": False,
+            "step": "no_sender_email",
+            "error": "BREVO_SENDER_EMAIL is NOT set.",
+            "fix": "Add BREVO_SENDER_EMAIL=shreeyadwad@gmail.com to Render environment variables.",
         }
+
+    try:
+        resp = _httpx.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={
+                "api-key": brevo_key,
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            json={
+                "sender": {"name": sender_name, "email": sender_email},
+                "to": [{"email": to}],
+                "subject": "Student Hub — Email Delivery Test",
+                "htmlContent": "<p><b>Student Hub Email Test ✅</b></p><p>Email delivery is working! OTP and password reset emails will now arrive.</p>",
+            },
+            timeout=15.0,
+        )
+
+        if resp.status_code in (200, 201):
+            return {
+                "success": True,
+                "message": f"Test email sent to {to} via Brevo! Check your inbox (and spam folder).",
+                "from": f"{sender_name} <{sender_email}>",
+                "brevo_response": resp.json(),
+            }
+        else:
+            return {
+                "success": False,
+                "step": "brevo_api_error",
+                "http_status": resp.status_code,
+                "error": resp.text,
+                "fix": (
+                    "If you see 'Sender not found': Go to Brevo → Settings → Senders & IP → Add Sender → "
+                    f"add {sender_email} and click the verification link sent to that Gmail."
+                ),
+            }
 
     except Exception as exc:
         return {
             "success": False,
-            "step": "resend_send_failed",
+            "step": "request_failed",
             "error": str(exc),
-            "fix": "Check that your RESEND_API_KEY is correct and has send permissions.",
         }

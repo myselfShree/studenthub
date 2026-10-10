@@ -1,56 +1,107 @@
 """
-Email service — uses Resend (HTTPS API) which works on Render free tier.
+Email service — uses Brevo (formerly Sendinblue) HTTPS API.
 
-Render's free tier blocks outbound SMTP (ports 587/465), so we use Resend's
-HTTP API instead. Resend is free up to 3,000 emails/month.
+WHY BREVO?
+- Render free tier BLOCKS outbound SMTP (ports 587/465) → can't use Gmail SMTP
+- Resend requires a verified domain to send to other users
+- Brevo only requires verifying your sender Gmail address — no domain needed
+- Free tier: 300 emails/day, 9,000/month
 
-Required Environment Variables on Render:
-- RESEND_API_KEY: Get from https://resend.com (free signup, no credit card)
-- RESEND_FROM_EMAIL: Sender address, e.g. "Student Hub <onboarding@resend.dev>"
-  (Use onboarding@resend.dev for testing, or a verified domain for production)
-
-Optional fallback (only works locally, NOT on Render free tier):
-- SMTP_USER, SMTP_PASSWORD for local development
+Setup (5 minutes):
+1. Sign up free at https://app.brevo.com (no credit card)
+2. Go to Settings → Senders & IP → Add Sender → add your Gmail → verify it
+3. Go to SMTP & API → API Keys → Create Key → copy it
+4. On Render: add BREVO_API_KEY = <your_key>
+5. On Render: add BREVO_SENDER_EMAIL = shreeyadwad@gmail.com
+6. On Render: add BREVO_SENDER_NAME = Student Hub
 """
 import logging
-from typing import Optional
+import httpx
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
+
 
 def send_email(to_email: str, subject: str, html_body: str) -> bool:
     """
-    Send an email via Resend HTTP API (works on Render free tier).
-    Falls back to SMTP only in local dev if RESEND_API_KEY is not set.
+    Send an email via Brevo HTTPS API (works on Render free tier).
+    No domain verification needed — just verify your sender Gmail address on Brevo.
     Returns True on success, False on failure.
     """
-    resend_key = (getattr(settings, "RESEND_API_KEY", None) or "").strip()
+    brevo_key = (getattr(settings, "BREVO_API_KEY", None) or "").strip()
 
+    if brevo_key:
+        return _send_via_brevo(to_email, subject, html_body, brevo_key)
+
+    # Fallback: try Resend if configured
+    resend_key = (getattr(settings, "RESEND_API_KEY", None) or "").strip()
     if resend_key:
         return _send_via_resend(to_email, subject, html_body, resend_key)
-    else:
-        logger.warning(
-            "RESEND_API_KEY is not set. Trying SMTP fallback for %s. "
-            "NOTE: SMTP does not work on Render free tier — set RESEND_API_KEY instead. "
-            "Get a free key at https://resend.com",
-            to_email,
+
+    logger.warning(
+        "No email service configured. Email to %s was NOT sent. "
+        "Set BREVO_API_KEY on Render (free at https://app.brevo.com).",
+        to_email,
+    )
+    return False
+
+
+def _send_via_brevo(to_email: str, subject: str, html_body: str, api_key: str) -> bool:
+    """Send email using Brevo HTTPS API. No domain needed — just verify sender email."""
+    sender_email = (getattr(settings, "BREVO_SENDER_EMAIL", None) or "").strip()
+    sender_name = (getattr(settings, "BREVO_SENDER_NAME", None) or "Student Hub").strip()
+
+    if not sender_email:
+        logger.error(
+            "BREVO_SENDER_EMAIL is not set. Add it to Render env vars "
+            "(e.g. shreeyadwad@gmail.com — must be verified in Brevo Senders)."
         )
-        return _send_via_smtp(to_email, subject, html_body)
+        return False
+
+    payload = {
+        "sender": {"name": sender_name, "email": sender_email},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "htmlContent": html_body,
+    }
+
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            resp = client.post(
+                BREVO_API_URL,
+                headers={
+                    "api-key": api_key,
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                },
+                json=payload,
+            )
+
+        if resp.status_code in (200, 201):
+            data = resp.json()
+            logger.info("Brevo email sent to %s — messageId: %s", to_email, data.get("messageId", "unknown"))
+            return True
+        else:
+            logger.error(
+                "Brevo API returned HTTP %s for %s: %s",
+                resp.status_code, to_email, resp.text,
+            )
+            return False
+
+    except Exception as exc:
+        logger.error("Brevo email delivery failed to %s: %s", to_email, exc)
+        return False
 
 
 def _send_via_resend(to_email: str, subject: str, html_body: str, api_key: str) -> bool:
-    """Send email using Resend HTTPS API."""
+    """Fallback: send via Resend (requires verified domain for non-owner emails)."""
     try:
         import resend
         resend.api_key = api_key
-
-        from_email = (getattr(settings, "RESEND_FROM_EMAIL", None) or "").strip()
-        if not from_email:
-            # Default: use Resend's shared testing domain (works without domain verification)
-            from_email = "Student Hub <onboarding@resend.dev>"
-
+        from_email = (getattr(settings, "RESEND_FROM_EMAIL", None) or "Student Hub <onboarding@resend.dev>").strip()
         params: resend.Emails.SendParams = {
             "from": from_email,
             "to": [to_email],
@@ -58,65 +109,11 @@ def _send_via_resend(to_email: str, subject: str, html_body: str, api_key: str) 
             "html": html_body,
         }
         email = resend.Emails.send(params)
-        logger.info("Email sent via Resend to %s — id: %s", to_email, email.get("id", "unknown"))
+        logger.info("Resend email sent to %s — id: %s", to_email, email.get("id", "unknown"))
         return True
-
     except Exception as exc:
         logger.error("Resend email delivery failed to %s: %s", to_email, exc)
         return False
-
-
-def _send_via_smtp(to_email: str, subject: str, html_body: str) -> bool:
-    """SMTP fallback for local development only. Does NOT work on Render free tier."""
-    import smtplib
-    from email.mime.text import MIMEText
-    from email.mime.multipart import MIMEMultipart
-
-    smtp_user = (getattr(settings, "SMTP_USER", None) or "").strip().strip("'\"")
-    smtp_password = (getattr(settings, "SMTP_PASSWORD", None) or "").strip().replace(" ", "").strip("'\"")
-
-    if not smtp_user or not smtp_password:
-        logger.warning(
-            "No email credentials set. Email to %s was NOT sent. "
-            "On Render: set RESEND_API_KEY. Locally: set SMTP_USER + SMTP_PASSWORD.",
-            to_email,
-        )
-        return False
-
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = f"{settings.EMAIL_FROM_NAME or 'Student Hub'} <{smtp_user}>"
-    msg["To"] = to_email
-    msg.attach(MIMEText(html_body, "html", "utf-8"))
-
-    host = getattr(settings, "SMTP_HOST", "smtp.gmail.com")
-    attempts = [(587, False), (465, True)]
-    last_error = None
-
-    for port, use_ssl in attempts:
-        try:
-            if use_ssl:
-                with smtplib.SMTP_SSL(host, port, timeout=15) as server:
-                    server.login(smtp_user, smtp_password)
-                    server.sendmail(smtp_user, [to_email], msg.as_string())
-            else:
-                with smtplib.SMTP(host, port, timeout=15) as server:
-                    server.ehlo()
-                    server.starttls()
-                    server.ehlo()
-                    server.login(smtp_user, smtp_password)
-                    server.sendmail(smtp_user, [to_email], msg.as_string())
-            logger.info("SMTP email sent to %s via port %s", to_email, port)
-            return True
-        except smtplib.SMTPAuthenticationError as exc:
-            logger.error("SMTP auth failed for %s: %s", smtp_user, exc)
-            return False
-        except Exception as exc:
-            last_error = exc
-            continue
-
-    logger.error("All SMTP attempts failed for %s: %s", to_email, last_error)
-    return False
 
 
 def send_password_reset_email(to_email: str, reset_link: str, user_name: str = "there") -> bool:
