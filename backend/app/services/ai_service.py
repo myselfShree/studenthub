@@ -142,12 +142,13 @@ class AIService:
                         candidates = data.get("candidates", [])
                         if candidates:
                             parts = candidates[0].get("content", {}).get("parts", [])
-                            if parts and "text" in parts[0]:
-                                text = parts[0]["text"]
-                                if text and text.strip():
-                                    self._active_model_name = clean_model
-                                    self._last_error = None
-                                    return text.strip()
+                            # Combine all text parts (handles thought parts and multi-chunk output)
+                            text_chunks = [p.get("text", "").strip() for p in parts if isinstance(p, dict) and p.get("text")]
+                            full_text = " ".join(t for t in text_chunks if t)
+                            if full_text:
+                                self._active_model_name = clean_model
+                                self._last_error = None
+                                return full_text
                         last_errors.append(f"{clean_model}: empty candidate text")
                     else:
                         err_summary = resp.text[:120].replace("\n", " ")

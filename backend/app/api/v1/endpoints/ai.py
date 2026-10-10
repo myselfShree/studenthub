@@ -162,8 +162,10 @@ def debug_gemini_public(prompt: str = "Hello, reply in one short sentence."):
                 resp = client.post(url, json=payload)
                 if resp.status_code == 200:
                     data = resp.json()
-                    parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])
-                    reply_text = parts[0].get("text", "").strip() if parts else ""
+                    candidates = data.get("candidates", [])
+                    parts = candidates[0].get("content", {}).get("parts", []) if candidates else []
+                    text_chunks = [p.get("text", "").strip() for p in parts if isinstance(p, dict) and p.get("text")]
+                    reply_text = " ".join(t for t in text_chunks if t)
                     return {
                         "success": True,
                         "working_model": model,
