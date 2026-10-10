@@ -30,6 +30,7 @@ def clean_smtp_credentials() -> tuple[Optional[str], Optional[str]]:
 def send_email(to_email: str, subject: str, html_body: str) -> bool:
     """
     Send an email via SMTP.
+    Tries STARTTLS (port 587) first, then falls back to SSL (port 465).
     Returns True on successful delivery, False on failure.
     """
     smtp_user, smtp_password = clean_smtp_credentials()
@@ -37,50 +38,63 @@ def send_email(to_email: str, subject: str, html_body: str) -> bool:
     if not smtp_user or not smtp_password:
         logger.warning(
             "SMTP credentials not configured (SMTP_USER or SMTP_PASSWORD is missing). "
-            "Password reset email to %s was not sent. "
-            "To enable live emails, set SMTP_USER (e.g. shreeyadwad@gmail.com) and "
-            "SMTP_PASSWORD (Gmail 16-digit App Password) in your Render environment variables.",
+            "Email to %s was not sent. "
+            "Set SMTP_USER and SMTP_PASSWORD (Gmail 16-char App Password) in Render environment variables.",
             to_email,
         )
         return False
 
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        sender_name = settings.EMAIL_FROM_NAME or "Student Hub"
-        msg["From"] = f"{sender_name} <{smtp_user}>"
-        msg["To"] = to_email
-        msg.attach(MIMEText(html_body, "html", "utf-8"))
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    sender_name = settings.EMAIL_FROM_NAME or "Student Hub"
+    msg["From"] = f"{sender_name} <{smtp_user}>"
+    msg["To"] = to_email
+    msg.attach(MIMEText(html_body, "html", "utf-8"))
 
-        port = int(settings.SMTP_PORT)
+    configured_port = int(settings.SMTP_PORT)
+    host = settings.SMTP_HOST
 
-        if port == 465:
-            # SSL
-            with smtplib.SMTP_SSL(settings.SMTP_HOST, port, timeout=12) as server:
-                server.login(smtp_user, smtp_password)
-                server.sendmail(smtp_user, [to_email], msg.as_string())
-        else:
-            # STARTTLS (e.g. 587)
-            with smtplib.SMTP(settings.SMTP_HOST, port, timeout=12) as server:
-                server.ehlo()
-                server.starttls()
-                server.ehlo()
-                server.login(smtp_user, smtp_password)
-                server.sendmail(smtp_user, [to_email], msg.as_string())
+    # Build list of (port, use_ssl) attempts: try configured port first, then the other
+    if configured_port == 465:
+        attempts = [(465, True), (587, False)]
+    else:
+        attempts = [(587, False), (465, True)]
 
-        logger.info("Successfully sent email to %s (subject: %s)", to_email, subject)
-        return True
+    last_error = None
+    for port, use_ssl in attempts:
+        try:
+            if use_ssl:
+                with smtplib.SMTP_SSL(host, port, timeout=15) as server:
+                    server.login(smtp_user, smtp_password)
+                    server.sendmail(smtp_user, [to_email], msg.as_string())
+            else:
+                with smtplib.SMTP(host, port, timeout=15) as server:
+                    server.ehlo()
+                    server.starttls()
+                    server.ehlo()
+                    server.login(smtp_user, smtp_password)
+                    server.sendmail(smtp_user, [to_email], msg.as_string())
 
-    except smtplib.SMTPAuthenticationError as exc:
-        logger.error(
-            "SMTP Authentication failed for %s. Ensure 2-Step Verification is active on Google "
-            "and a dedicated App Password (not your account password) is set: %s",
-            smtp_user, exc,
-        )
-        return False
-    except Exception as exc:
-        logger.error("Failed to send email to %s via SMTP (%s:%s): %s", to_email, settings.SMTP_HOST, settings.SMTP_PORT, exc)
-        return False
+            logger.info("Email sent to %s via %s:%s (ssl=%s)", to_email, host, port, use_ssl)
+            return True
+
+        except smtplib.SMTPAuthenticationError as exc:
+            logger.error(
+                "SMTP Authentication FAILED for user '%s' on %s:%s. "
+                "Make sure SMTP_PASSWORD is a Gmail 16-character App Password "
+                "(get it at https://myaccount.google.com/apppasswords). Error: %s",
+                smtp_user, host, port, exc,
+            )
+            return False  # Auth failure won't be fixed by trying another port
+
+        except Exception as exc:
+            logger.warning("SMTP attempt failed on %s:%s (ssl=%s): %s", host, port, use_ssl, exc)
+            last_error = exc
+            continue
+
+    logger.error("All SMTP delivery attempts failed for %s. Last error: %s", to_email, last_error)
+    return False
+
 
 
 def send_password_reset_email(to_email: str, reset_link: str, user_name: str = "there") -> bool:

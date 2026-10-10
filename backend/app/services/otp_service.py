@@ -4,6 +4,7 @@ OTP & Multi-Factor Authentication (MFA) Service.
 Provides secure 6-digit numeric OTP generation, verification, and dispatch
 over Email (SMTP) and Mobile SMS (Fast2SMS / gateway with demo fallback).
 """
+import os
 import secrets
 import logging
 from datetime import datetime, timedelta, timezone

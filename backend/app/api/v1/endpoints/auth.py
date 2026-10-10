@@ -266,3 +266,74 @@ def smtp_status(current_user: User = Depends(get_current_active_user)):
             )
         ),
     }
+
+
+# ── Live SMTP test (auth required) ──────────────────────────────────────────
+
+@router.post("/test-email")
+def test_email(current_user: User = Depends(get_current_active_user)):
+    """
+    Attempts to send a real test email to the logged-in user's address.
+    Returns the exact error message so you can diagnose SMTP issues.
+    """
+    import smtplib
+    from app.services.email_service import clean_smtp_credentials
+
+    smtp_user, smtp_password = clean_smtp_credentials()
+
+    if not smtp_user or not smtp_password:
+        return {
+            "success": False,
+            "error": "SMTP_USER or SMTP_PASSWORD is not set on this server. Go to Render → Environment and add them.",
+            "smtp_user_set": bool(smtp_user),
+            "smtp_password_set": bool(smtp_password),
+        }
+
+    to_email = current_user.email
+    subject = "Student Hub — SMTP Test Email"
+    body = f"<p>Hello {current_user.name},</p><p>This is a test email from Student Hub. If you received this, SMTP is working correctly!</p>"
+
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = f"Student Hub <{smtp_user}>"
+    msg["To"] = to_email
+    msg.attach(MIMEText(body, "html", "utf-8"))
+
+    port = int(settings.SMTP_PORT)
+
+    try:
+        if port == 465:
+            with smtplib.SMTP_SSL(settings.SMTP_HOST, port, timeout=15) as server:
+                server.login(smtp_user, smtp_password)
+                server.sendmail(smtp_user, [to_email], msg.as_string())
+        else:
+            with smtplib.SMTP(settings.SMTP_HOST, port, timeout=15) as server:
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
+                server.login(smtp_user, smtp_password)
+                server.sendmail(smtp_user, [to_email], msg.as_string())
+
+        return {
+            "success": True,
+            "message": f"Test email sent to {to_email}. Check your inbox (and spam folder).",
+            "smtp_host": settings.SMTP_HOST,
+            "smtp_port": port,
+            "smtp_user": smtp_user,
+        }
+
+    except smtplib.SMTPAuthenticationError as exc:
+        return {
+            "success": False,
+            "error": "SMTP Authentication failed. Your SMTP_PASSWORD is wrong or not a 16-character App Password.",
+            "detail": str(exc),
+            "fix": "Go to https://myaccount.google.com/apppasswords, create an App Password for 'StudentHub', copy the 16-char code (no spaces) and paste it as SMTP_PASSWORD in Render.",
+        }
+    except smtplib.SMTPException as exc:
+        return {"success": False, "error": f"SMTP error: {exc}"}
+    except Exception as exc:
+        return {"success": False, "error": f"Unexpected error: {exc}"}
+

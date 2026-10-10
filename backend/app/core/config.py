@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     # AI
     GEMINI_API_KEY: Optional[str] = ""
 
+    # SMS (Fast2SMS)
+    FAST2SMS_API_KEY: Optional[str] = None
+
     # File storage
     UPLOAD_DIR: str = "storage/uploads"
     MAX_FILE_SIZE_MB: int = 50
