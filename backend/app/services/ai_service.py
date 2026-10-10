@@ -21,13 +21,13 @@ import httpx
 logger = logging.getLogger("studenthub.ai")
 
 DEFAULT_CANDIDATE_MODELS = [
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-    "gemini-2.5-pro",
     "gemini-3.8-flash",
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
+    "gemini-3.8-flash-lite",
+    "gemini-3.7-flash",
+    "gemini-3.5-flash",
+    "gemini-flash-latest",
+    "gemini-flash-lite-latest",
+    "gemini-pro-latest",
 ]
 
 
@@ -62,7 +62,7 @@ class AIService:
         
         try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
-            with httpx.Client(timeout=4.0) as client:
+            with httpx.Client(timeout=8.0) as client:
                 resp = client.get(url)
                 if resp.status_code == 200:
                     data = resp.json()
@@ -72,21 +72,27 @@ class AIService:
                         name = m.get("name", "").replace("models/", "")
                         # Exclude non-text/TTS audio models
                         if "generateContent" in methods and "gemini" in name:
-                            if "-tts" not in name and "embed" not in name:
+                            if "-tts" not in name and "embed" not in name and "banana" not in name:
                                 models.append(name)
                     
-                    # Sort so flash-latest and general text models come first
+                    # Prioritize latest flash models first
                     def rank(m_name: str) -> int:
                         n = m_name.lower()
-                        if "flash-latest" in n:
+                        if "3.8-flash" in n:
                             return 1
-                        if "flash-lite-latest" in n:
+                        if "3.7-flash" in n:
                             return 2
-                        if "flash" in n and "preview" not in n:
+                        if "3.5-flash" in n:
                             return 3
-                        if "pro" in n and "preview" not in n:
+                        if "flash-latest" in n:
                             return 4
-                        return 10
+                        if "flash-lite-latest" in n:
+                            return 5
+                        if "pro-latest" in n:
+                            return 6
+                        if "flash" in n and "preview" not in n:
+                            return 7
+                        return 20
 
                     models.sort(key=rank)
                     if models:
@@ -96,7 +102,7 @@ class AIService:
         except Exception as exc:
             logger.debug(f"Dynamic model discovery failed: {exc}")
         
-        return ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-1.5-flash-latest", "gemini-pro-latest"]
+        return ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-pro-latest"]
 
     def _call_gemini_resilient(self, prompt: str) -> Optional[str]:
         """Tries discovered/candidate models in order using direct REST requests."""

@@ -147,7 +147,7 @@ def debug_gemini_public(prompt: str = "Hello, reply in one short sentence."):
         }
 
     key_preview = f"{key[:6]}...{key[-4:]}" if len(key) >= 10 else "***"
-    models_to_test = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+    models_to_test = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-pro-latest"]
     attempts = []
 
     payload = {
