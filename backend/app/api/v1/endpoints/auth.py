@@ -338,94 +338,56 @@ def test_email(current_user: User = Depends(get_current_active_user)):
         return {"success": False, "error": f"Unexpected error: {exc}"}
 
 
-# ── Public SMTP debug (NO auth required — for quick testing only) ────────────
+# ── Public email debug (NO auth required — for quick testing only) ───────────
 
 @router.get("/debug-smtp")
-def debug_smtp_public(to: str = "shreeyadwad@gmail.com"):
+def debug_email_public(to: str = "shreeyadwad@gmail.com"):
     """
-    PUBLIC endpoint (no login needed) — sends a test email and returns
-    the exact result so you can diagnose SMTP without logging in via Swagger.
+    PUBLIC endpoint (no login needed) — sends a test email via Resend and
+    returns the exact result so you can confirm email delivery is working.
 
     Usage: GET /api/v1/auth/debug-smtp?to=your@email.com
     """
-    import smtplib
-    from email.mime.text import MIMEText
-    from email.mime.multipart import MIMEMultipart
-    from app.services.email_service import clean_smtp_credentials
+    resend_key = (getattr(settings, "RESEND_API_KEY", None) or "").strip()
 
-    smtp_user, smtp_password = clean_smtp_credentials()
-
-    # 1. Check credentials are set
-    if not smtp_user or not smtp_password:
+    if not resend_key:
         return {
             "success": False,
             "step": "credentials_check",
-            "error": "SMTP_USER or SMTP_PASSWORD is NOT set on this server.",
-            "smtp_user_set": bool(smtp_user),
-            "smtp_user_value": smtp_user or "MISSING",
-            "smtp_password_set": bool(smtp_password),
-            "smtp_password_length": len(smtp_password) if smtp_password else 0,
-            "fix": "Go to Render Dashboard → your backend service → Environment tab → add SMTP_USER and SMTP_PASSWORD (16-char Gmail App Password).",
+            "error": "RESEND_API_KEY is NOT set on this server.",
+            "fix": (
+                "1. Go to https://resend.com and sign up free (no credit card needed). "
+                "2. Click 'API Keys' → 'Create API Key' → copy the key. "
+                "3. In Render Dashboard → your backend → Environment → add RESEND_API_KEY = <your_key>. "
+                "4. Also add RESEND_FROM_EMAIL = 'Student Hub <onboarding@resend.dev>' for testing. "
+                "5. Save and redeploy, then try this URL again."
+            ),
         }
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = "Student Hub — SMTP Debug Test"
-    msg["From"] = f"Student Hub <{smtp_user}>"
-    msg["To"] = to
-    msg.attach(MIMEText(
-        "<p><b>Student Hub SMTP Test</b></p><p>If you see this email, email delivery is working correctly!</p>",
-        "html", "utf-8"
-    ))
+    try:
+        import resend
+        resend.api_key = resend_key
 
-    host = settings.SMTP_HOST
-    attempts = [(587, False), (465, True)]
-    errors = []
+        from_email = (getattr(settings, "RESEND_FROM_EMAIL", None) or "Student Hub <onboarding@resend.dev>").strip()
 
-    for port, use_ssl in attempts:
-        try:
-            if use_ssl:
-                with smtplib.SMTP_SSL(host, port, timeout=15) as server:
-                    server.login(smtp_user, smtp_password)
-                    server.sendmail(smtp_user, [to], msg.as_string())
-            else:
-                with smtplib.SMTP(host, port, timeout=15) as server:
-                    server.ehlo()
-                    server.starttls()
-                    server.ehlo()
-                    server.login(smtp_user, smtp_password)
-                    server.sendmail(smtp_user, [to], msg.as_string())
+        params: resend.Emails.SendParams = {
+            "from": from_email,
+            "to": [to],
+            "subject": "Student Hub — Email Delivery Test",
+            "html": "<p><b>Student Hub Email Test</b></p><p>If you received this, your email system is working correctly! OTP and password reset emails will now be delivered.</p>",
+        }
+        email = resend.Emails.send(params)
+        return {
+            "success": True,
+            "message": f"Test email sent to {to} via Resend. Check your inbox (and spam folder).",
+            "resend_email_id": email.get("id", "unknown"),
+            "from": from_email,
+        }
 
-            return {
-                "success": True,
-                "message": f"Test email sent to {to} via port {port}. Check your inbox and spam folder.",
-                "smtp_host": host,
-                "smtp_port": port,
-                "smtp_user": smtp_user,
-            }
-
-        except smtplib.SMTPAuthenticationError as exc:
-            return {
-                "success": False,
-                "step": f"auth_port_{port}",
-                "error": "SMTP Authentication FAILED — your SMTP_PASSWORD is incorrect.",
-                "detail": str(exc),
-                "smtp_user": smtp_user,
-                "smtp_password_length": len(smtp_password),
-                "fix": (
-                    "Your SMTP_PASSWORD must be a 16-character Gmail App Password (NOT your Gmail login password). "
-                    "Go to https://myaccount.google.com/apppasswords → create one for 'StudentHub' → "
-                    "copy the code WITHOUT spaces → paste into Render SMTP_PASSWORD env var."
-                ),
-            }
-
-        except Exception as exc:
-            errors.append(f"port {port}: {exc}")
-            continue
-
-    return {
-        "success": False,
-        "step": "all_ports_failed",
-        "error": "Could not connect to Gmail SMTP on any port.",
-        "attempts": errors,
-        "fix": "Check that SMTP_HOST=smtp.gmail.com and that your Render server can reach the internet on ports 587 and 465.",
-    }
+    except Exception as exc:
+        return {
+            "success": False,
+            "step": "resend_send_failed",
+            "error": str(exc),
+            "fix": "Check that your RESEND_API_KEY is correct and has send permissions.",
+        }

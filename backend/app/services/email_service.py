@@ -1,18 +1,18 @@
 """
-Email service using Python's built-in smtplib.
+Email service — uses Resend (HTTPS API) which works on Render free tier.
 
-Required Environment Variables on Render / Production:
-- SMTP_HOST: default "smtp.gmail.com"
-- SMTP_PORT: default 587 (or 465 for SSL)
-- SMTP_USER: your full Gmail or SMTP address, e.g. shreeyadwad@gmail.com
-- SMTP_PASSWORD: Gmail 16-character App Password (without spaces)
-- EMAIL_FROM_NAME: default "Student Hub"
-- FRONTEND_URL: e.g. "https://studenthub-amber.vercel.app"
+Render's free tier blocks outbound SMTP (ports 587/465), so we use Resend's
+HTTP API instead. Resend is free up to 3,000 emails/month.
+
+Required Environment Variables on Render:
+- RESEND_API_KEY: Get from https://resend.com (free signup, no credit card)
+- RESEND_FROM_EMAIL: Sender address, e.g. "Student Hub <onboarding@resend.dev>"
+  (Use onboarding@resend.dev for testing, or a verified domain for production)
+
+Optional fallback (only works locally, NOT on Render free tier):
+- SMTP_USER, SMTP_PASSWORD for local development
 """
-import smtplib
 import logging
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from typing import Optional
 
 from app.core.config import settings
@@ -20,47 +20,79 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
-def clean_smtp_credentials() -> tuple[Optional[str], Optional[str]]:
-    """Clean and return (user, password) stripping spaces and quotes."""
-    user = (settings.SMTP_USER or "").strip().strip("'\"")
-    password = (settings.SMTP_PASSWORD or "").strip().replace(" ", "").strip("'\"")
-    return (user if user else None, password if password else None)
-
-
 def send_email(to_email: str, subject: str, html_body: str) -> bool:
     """
-    Send an email via SMTP.
-    Tries STARTTLS (port 587) first, then falls back to SSL (port 465).
-    Returns True on successful delivery, False on failure.
+    Send an email via Resend HTTP API (works on Render free tier).
+    Falls back to SMTP only in local dev if RESEND_API_KEY is not set.
+    Returns True on success, False on failure.
     """
-    smtp_user, smtp_password = clean_smtp_credentials()
+    resend_key = (getattr(settings, "RESEND_API_KEY", None) or "").strip()
+
+    if resend_key:
+        return _send_via_resend(to_email, subject, html_body, resend_key)
+    else:
+        logger.warning(
+            "RESEND_API_KEY is not set. Trying SMTP fallback for %s. "
+            "NOTE: SMTP does not work on Render free tier — set RESEND_API_KEY instead. "
+            "Get a free key at https://resend.com",
+            to_email,
+        )
+        return _send_via_smtp(to_email, subject, html_body)
+
+
+def _send_via_resend(to_email: str, subject: str, html_body: str, api_key: str) -> bool:
+    """Send email using Resend HTTPS API."""
+    try:
+        import resend
+        resend.api_key = api_key
+
+        from_email = (getattr(settings, "RESEND_FROM_EMAIL", None) or "").strip()
+        if not from_email:
+            # Default: use Resend's shared testing domain (works without domain verification)
+            from_email = "Student Hub <onboarding@resend.dev>"
+
+        params: resend.Emails.SendParams = {
+            "from": from_email,
+            "to": [to_email],
+            "subject": subject,
+            "html": html_body,
+        }
+        email = resend.Emails.send(params)
+        logger.info("Email sent via Resend to %s — id: %s", to_email, email.get("id", "unknown"))
+        return True
+
+    except Exception as exc:
+        logger.error("Resend email delivery failed to %s: %s", to_email, exc)
+        return False
+
+
+def _send_via_smtp(to_email: str, subject: str, html_body: str) -> bool:
+    """SMTP fallback for local development only. Does NOT work on Render free tier."""
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+
+    smtp_user = (getattr(settings, "SMTP_USER", None) or "").strip().strip("'\"")
+    smtp_password = (getattr(settings, "SMTP_PASSWORD", None) or "").strip().replace(" ", "").strip("'\"")
 
     if not smtp_user or not smtp_password:
         logger.warning(
-            "SMTP credentials not configured (SMTP_USER or SMTP_PASSWORD is missing). "
-            "Email to %s was not sent. "
-            "Set SMTP_USER and SMTP_PASSWORD (Gmail 16-char App Password) in Render environment variables.",
+            "No email credentials set. Email to %s was NOT sent. "
+            "On Render: set RESEND_API_KEY. Locally: set SMTP_USER + SMTP_PASSWORD.",
             to_email,
         )
         return False
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    sender_name = settings.EMAIL_FROM_NAME or "Student Hub"
-    msg["From"] = f"{sender_name} <{smtp_user}>"
+    msg["From"] = f"{settings.EMAIL_FROM_NAME or 'Student Hub'} <{smtp_user}>"
     msg["To"] = to_email
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
-    configured_port = int(settings.SMTP_PORT)
-    host = settings.SMTP_HOST
-
-    # Build list of (port, use_ssl) attempts: try configured port first, then the other
-    if configured_port == 465:
-        attempts = [(465, True), (587, False)]
-    else:
-        attempts = [(587, False), (465, True)]
-
+    host = getattr(settings, "SMTP_HOST", "smtp.gmail.com")
+    attempts = [(587, False), (465, True)]
     last_error = None
+
     for port, use_ssl in attempts:
         try:
             if use_ssl:
@@ -74,27 +106,17 @@ def send_email(to_email: str, subject: str, html_body: str) -> bool:
                     server.ehlo()
                     server.login(smtp_user, smtp_password)
                     server.sendmail(smtp_user, [to_email], msg.as_string())
-
-            logger.info("Email sent to %s via %s:%s (ssl=%s)", to_email, host, port, use_ssl)
+            logger.info("SMTP email sent to %s via port %s", to_email, port)
             return True
-
         except smtplib.SMTPAuthenticationError as exc:
-            logger.error(
-                "SMTP Authentication FAILED for user '%s' on %s:%s. "
-                "Make sure SMTP_PASSWORD is a Gmail 16-character App Password "
-                "(get it at https://myaccount.google.com/apppasswords). Error: %s",
-                smtp_user, host, port, exc,
-            )
-            return False  # Auth failure won't be fixed by trying another port
-
+            logger.error("SMTP auth failed for %s: %s", smtp_user, exc)
+            return False
         except Exception as exc:
-            logger.warning("SMTP attempt failed on %s:%s (ssl=%s): %s", host, port, use_ssl, exc)
             last_error = exc
             continue
 
-    logger.error("All SMTP delivery attempts failed for %s. Last error: %s", to_email, last_error)
+    logger.error("All SMTP attempts failed for %s: %s", to_email, last_error)
     return False
-
 
 
 def send_password_reset_email(to_email: str, reset_link: str, user_name: str = "there") -> bool:
@@ -131,7 +153,7 @@ def send_password_reset_email(to_email: str, reset_link: str, user_name: str = "
               <a href="{reset_link}" style="color:#8E9B7A;word-break:break-all;">{reset_link}</a>
             </p>
             <p style="margin:20px 0 0;font-size:12px;color:#57564F;">
-              If you did not make this request, you can safely ignore this email — your account remains secure.
+              If you did not make this request, you can safely ignore this email.
             </p>
           </td>
         </tr>

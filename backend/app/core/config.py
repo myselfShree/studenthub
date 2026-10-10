@@ -44,13 +44,20 @@ class Settings(BaseSettings):
             f"@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
         )
 
-    # SMTP Email (Gmail or any SMTP provider)
+    # SMTP Email — fallback for local dev only (blocked by Render free tier)
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
-    SMTP_USER: Optional[str] = None       # e.g. yourapp@gmail.com
-    SMTP_PASSWORD: Optional[str] = None   # Gmail App Password
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
     EMAIL_FROM: str = "noreply@studenthub.app"
     EMAIL_FROM_NAME: str = "Student Hub"
+
+    # Resend (recommended for production — works on Render free tier)
+    # Sign up free at https://resend.com → API Keys → Create Key
+    RESEND_API_KEY: Optional[str] = None
+    # For testing use: "Student Hub <onboarding@resend.dev>"
+    # For production use a verified domain: "Student Hub <noreply@yourdomain.com>"
+    RESEND_FROM_EMAIL: Optional[str] = None
 
     # Password reset token expiry
     PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 30
