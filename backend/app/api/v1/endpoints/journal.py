@@ -1,4 +1,4 @@
-﻿from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from datetime import date
 from typing import List, Optional
@@ -32,9 +32,10 @@ def save_daily_journal(
 
 @router.get("/history", response_model=List[DailyJournalResponse])
 def get_journal_history(
-    limit: int = 30,
+    limit: int = Query(60, ge=1, le=365),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Get recent 3-point journal reflections history."""
     return journal_service.get_history(db, user_id=current_user.id, limit=limit)
+

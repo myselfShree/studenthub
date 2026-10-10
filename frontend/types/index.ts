@@ -180,3 +180,14 @@ export interface AIChatResponse {
   reply: string;
   interaction_id?: number | null;
 }
+
+export interface DailyJournal {
+  id?: number;
+  user_id?: number;
+  entry_date: string;
+  point_win: string;
+  point_insight: string;
+  point_improvement: string;
+  created_at?: string;
+  updated_at?: string;
+}

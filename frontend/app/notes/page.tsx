@@ -285,6 +285,10 @@ export default function NotesPage() {
 
   // AI Operations
   const handleAISummarize = async () => {
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     const text = content.trim() || activeNote?.content?.trim();
     if (!text) return;
     setAiLoading(true);
@@ -302,6 +306,10 @@ export default function NotesPage() {
   };
 
   const handleAIKeyPoints = async () => {
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     const text = content.trim() || activeNote?.content?.trim();
     if (!text) return;
     setAiLoading(true);
@@ -319,6 +327,10 @@ export default function NotesPage() {
   };
 
   const handleAIGenerateQuiz = async () => {
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     const text = content.trim() || activeNote?.content?.trim();
     if (!text) return;
     setAiLoading(true);
@@ -340,6 +352,10 @@ export default function NotesPage() {
 
   const handleAIExplain = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     if (!explainTopic.trim()) return;
     setAiLoading(true);
     try {
@@ -354,6 +370,10 @@ export default function NotesPage() {
 
   const handleSendChat = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     const msg = chatInput.trim();
     if (!msg) return;
 

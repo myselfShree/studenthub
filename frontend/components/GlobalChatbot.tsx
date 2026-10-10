@@ -3,6 +3,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { X, Send, BrainCircuit, Sparkles } from 'lucide-react';
+import AuthPromptModal from '@/components/AuthPromptModal';
+import { useAuth } from '@/context/AuthContext';
 
 interface ChatMsg {
   role: 'user' | 'assistant';
@@ -10,7 +12,9 @@ interface ChatMsg {
 }
 
 export default function GlobalChatbot() {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
+  const [authPromptOpen, setAuthPromptOpen] = useState(false);
   const [msgs, setMsgs] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -22,6 +26,10 @@ export default function GlobalChatbot() {
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     const msg = input.trim();
     if (!msg) return;
     const userMsg: ChatMsg = { role: 'user', content: msg };
@@ -144,6 +152,13 @@ export default function GlobalChatbot() {
           </form>
         </div>
       )}
+
+      <AuthPromptModal
+        isOpen={authPromptOpen}
+        onClose={() => setAuthPromptOpen(false)}
+        title="Sign in to chat with AI Study Assistant"
+        description="Create your free Student Hub account to ask academic doubts, get instant study explanations, and save interactions."
+      />
     </>
   );
 }

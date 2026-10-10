@@ -18,6 +18,8 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { AIQuizResponse, AISummaryResponse, AIExplainResponse } from '@/types';
+import AuthPromptModal from '@/components/AuthPromptModal';
+import { useAuth } from '@/context/AuthContext';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -25,7 +27,9 @@ interface ChatMessage {
 }
 
 export default function AIAssistantPage() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'chat' | 'explain' | 'quiz' | 'summarize'>('chat');
+  const [authPromptOpen, setAuthPromptOpen] = useState(false);
   
   // Chat state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -73,6 +77,10 @@ export default function AIAssistantPage() {
 
   const handleSendChat = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     const msg = chatInput.trim();
     if (!msg || chatLoading) return;
 
@@ -97,6 +105,10 @@ export default function AIAssistantPage() {
 
   const handleExplain = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     if (!explainTopic.trim() || explainLoading) return;
     setExplainLoading(true);
     try {
@@ -112,6 +124,10 @@ export default function AIAssistantPage() {
 
   const handleGenerateQuiz = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     if (!quizTopic.trim() || quizLoading) return;
     setQuizLoading(true);
     setSelectedAnswers({});
@@ -128,6 +144,10 @@ export default function AIAssistantPage() {
 
   const handleSummarize = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      setAuthPromptOpen(true);
+      return;
+    }
     if (!summarizeContent.trim() || summarizeLoading) return;
     setSummarizeLoading(true);
     try {
@@ -523,6 +543,13 @@ export default function AIAssistantPage() {
           </div>
         </div>
       </div>
+
+      <AuthPromptModal
+        isOpen={authPromptOpen}
+        onClose={() => setAuthPromptOpen(false)}
+        title="Sign in to use the AI Study Assistant"
+        description="Sign up for free to ask study questions, explain academic topics, generate practice quizzes, and synthesize lecture notes."
+      />
     </AppLayout>
   );
 }

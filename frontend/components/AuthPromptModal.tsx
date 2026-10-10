@@ -9,15 +9,18 @@ interface AuthPromptModalProps {
   onClose: () => void;
   title?: string;
   description?: string;
+  message?: string;
 }
 
 export default function AuthPromptModal({
   isOpen,
   onClose,
   title = "Create an account to continue",
-  description = "Sign up or log in to save your study notes, track daily habits, manage tasks, and access AI assistance."
+  description,
+  message
 }: AuthPromptModalProps) {
   if (!isOpen) return null;
+  const descText = message || description || "Sign up or log in to save your study notes, track daily habits, manage tasks, and access AI assistance.";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
@@ -46,7 +49,7 @@ export default function AuthPromptModal({
           {title}
         </h2>
         <p className="text-xs text-[var(--color-text-muted,#8D8777)] mt-2 leading-relaxed">
-          {description}
+          {descText}
         </p>
 
         {/* Action Buttons */}
