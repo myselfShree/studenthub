@@ -102,20 +102,15 @@ class AIService:
         """Tries discovered/candidate models in order using direct REST requests."""
         api_key = self.get_api_key()
         if not api_key:
-            return None
-
-        # Google Gemini API keys always start with AIza
-        if not api_key.startswith("AIza"):
-            logger.warning("Configured GEMINI_API_KEY does not start with 'AIza'. Skipping live network call.")
-            self._last_error = "Invalid key format: Gemini API keys must start with 'AIzaSy...'"
+            self._last_error = "GEMINI_API_KEY is not configured in environment variables."
             return None
 
         models_to_try = self._discover_models(api_key)
         if not models_to_try:
-            models_to_try = ["gemini-flash-latest", "gemini-flash-lite-latest"]
+            models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
 
-        # Limit to top 4 sorted text models
-        models_to_try = models_to_try[:4]
+        # Limit to top 5 sorted text models
+        models_to_try = models_to_try[:5]
 
         last_errors = []
         payload = {
@@ -130,7 +125,7 @@ class AIService:
             }
         }
 
-        with httpx.Client(timeout=12.0) as client:
+        with httpx.Client(timeout=15.0) as client:
             for model_name in models_to_try:
                 clean_model = model_name.replace("models/", "")
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={api_key}"
@@ -149,11 +144,11 @@ class AIService:
                                     return text.strip()
                         last_errors.append(f"{clean_model}: empty candidate text")
                     else:
-                        err_summary = resp.text[:100].replace("\n", " ")
-                        last_errors.append(f"{clean_model}: HTTP {resp.status_code}")
+                        err_summary = resp.text[:120].replace("\n", " ")
+                        last_errors.append(f"{clean_model} (HTTP {resp.status_code}): {err_summary}")
                         logger.warning(f"Model {clean_model} HTTP {resp.status_code}: {err_summary}")
                 except Exception as exc:
-                    err_msg = str(exc)[:60]
+                    err_msg = str(exc)[:80]
                     last_errors.append(f"{clean_model}: {err_msg}")
                     continue
 

@@ -118,3 +118,82 @@ def get_ai_history(
 def get_ai_status(current_user: User = Depends(get_current_active_user)):
     """Check whether Gemini AI is connected and active."""
     return ai_service.get_status()
+
+
+# ── Public Gemini AI diagnostic (NO auth required for quick verification) ────
+
+@router.get("/debug-gemini")
+def debug_gemini_public(prompt: str = "Hello, reply in one short sentence."):
+    """
+    PUBLIC endpoint (no login needed) — calls Gemini API directly with a test prompt
+    and returns the exact response or error details.
+
+    Usage: GET /api/v1/ai/debug-gemini
+    """
+    import httpx
+
+    key = ai_service.get_api_key()
+    if not key:
+        return {
+            "success": False,
+            "status": "missing_api_key",
+            "error": "GEMINI_API_KEY environment variable is NOT configured on Render.",
+            "fix": (
+                "1. Go to Google AI Studio: https://aistudio.google.com/app/apikey "
+                "2. Click 'Create API key' → copy the key (starts with AIzaSy...) "
+                "3. In Render Dashboard → backend service → Environment tab → "
+                "add GEMINI_API_KEY=<your_key> → click Save Changes."
+            )
+        }
+
+    key_preview = f"{key[:6]}...{key[-4:]}" if len(key) >= 10 else "***"
+    models_to_test = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+    attempts = []
+
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 100}
+    }
+
+    with httpx.Client(timeout=15.0) as client:
+        for model in models_to_test:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+            try:
+                resp = client.post(url, json=payload)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])
+                    reply_text = parts[0].get("text", "").strip() if parts else ""
+                    return {
+                        "success": True,
+                        "working_model": model,
+                        "key_length": len(key),
+                        "key_preview": key_preview,
+                        "test_prompt": prompt,
+                        "ai_reply": reply_text,
+                        "message": "Gemini AI is working perfectly on this backend!"
+                    }
+                else:
+                    attempts.append({
+                        "model": model,
+                        "status_code": resp.status_code,
+                        "error": resp.text[:200].replace("\n", " ")
+                    })
+            except Exception as exc:
+                attempts.append({
+                    "model": model,
+                    "error": str(exc)
+                })
+
+    return {
+        "success": False,
+        "status": "all_models_failed",
+        "key_length": len(key),
+        "key_preview": key_preview,
+        "attempts": attempts,
+        "fix": (
+            "If error is 400/API_KEY_INVALID: Generate a new key at https://aistudio.google.com/app/apikey. "
+            "If error is 429: You have hit the Google AI quota limit, wait a few minutes or create a fresh key."
+        )
+    }
+
